@@ -6,8 +6,9 @@ using Replicator Dynamics, and generates Play/Draw Mulligan Guides for any match
 
 from __future__ import annotations
 from dataclasses import dataclass
+import math
 import random
-import numpy as np
+from typing import Any
 
 from lorcana_ai.agents.heuristic_agent import TacticalHeuristicAgent
 from lorcana_ai.data.deck_io import Deck
@@ -20,9 +21,9 @@ from lorcana_ai.engine.simulator import LorcanaSimulator
 @dataclass
 class NashEquilibriumReport:
     deck_names: list[str]
-    payoff_matrix_bo3: np.ndarray  # (N, N) Bo3 winrate of row deck vs col deck
-    play_matrix: np.ndarray        # (N, N) On-the-Play winrate
-    draw_matrix: np.ndarray        # (N, N) On-the-Draw winrate
+    payoff_matrix_bo3: Any         # (N, N) Bo3 winrate of row deck vs col deck
+    play_matrix: Any               # (N, N) On-the-Play winrate
+    draw_matrix: Any               # (N, N) On-the-Draw winrate
     nash_weights: dict[str, float]
     expected_winrate_vs_current_meta: dict[str, float]
     best_counter_deck: str
@@ -57,55 +58,55 @@ class NashMetaSolver:
     ) -> NashEquilibriumReport:
         n = len(decks)
         names = [d.name for d in decks]
-        bo3_mat = np.full((n, n), 0.5, dtype=np.float64)
-        play_mat = np.full((n, n), 0.5, dtype=np.float64)
-        draw_mat = np.full((n, n), 0.5, dtype=np.float64)
+        bo3_mat = [[0.5 for _ in range(n)] for _ in range(n)]
+        play_mat = [[0.5 for _ in range(n)] for _ in range(n)]
+        draw_mat = [[0.5 for _ in range(n)] for _ in range(n)]
 
         for i in range(n):
             for j in range(i + 1, n):
                 stats = self.evaluator.evaluate_matchup(
                     decks[i], decks[j], num_games=games_per_pair, seed=900 + i * 31 + j * 7
                 )
-                bo3_mat[i, j] = stats.bo3_winrate
-                bo3_mat[j, i] = 1.0 - stats.bo3_winrate
-                play_mat[i, j] = stats.play_winrate
-                draw_mat[i, j] = stats.draw_winrate
-                play_mat[j, i] = 1.0 - stats.draw_winrate
-                draw_mat[j, i] = 1.0 - stats.play_winrate
+                bo3_mat[i][j] = round(stats.bo3_winrate, 4)
+                bo3_mat[j][i] = round(1.0 - stats.bo3_winrate, 4)
+                play_mat[i][j] = round(stats.play_winrate, 4)
+                draw_mat[i][j] = round(stats.draw_winrate, 4)
+                play_mat[j][i] = round(1.0 - stats.draw_winrate, 4)
+                draw_mat[j][i] = round(1.0 - stats.play_winrate, 4)
 
         # 1. Expected winrate against current human tournament metagame
-        prior_vec = np.array(
-            [current_meta_shares.get(nm, 1.0 / n) if current_meta_shares else (1.0 / n) for nm in names],
-            dtype=np.float64,
-        )
-        if prior_vec.sum() <= 0:
-            prior_vec = np.full(n, 1.0 / n, dtype=np.float64)
+        prior_vec = [
+            current_meta_shares.get(nm, 1.0 / n) if current_meta_shares else (1.0 / n)
+            for nm in names
+        ]
+        s_prior = sum(prior_vec)
+        if s_prior <= 0:
+            prior_vec = [1.0 / n for _ in range(n)]
         else:
-            prior_vec /= prior_vec.sum()
+            prior_vec = [v / s_prior for v in prior_vec]
 
         ev_vs_current: dict[str, float] = {}
         for i, nm in enumerate(names):
-            ev_vs_current[nm] = round(float(np.dot(bo3_mat[i], prior_vec)), 4)
+            ev_vs_current[nm] = round(sum(bo3_mat[i][j] * prior_vec[j] for j in range(n)), 4)
 
         best_counter = max(ev_vs_current.items(), key=lambda kv: kv[1])[0]
 
         # 2. Replicator Dynamics to find unexploitable Nash Equilibrium metagame mix
-        dist = np.full(n, 1.0 / n, dtype=np.float64)
+        dist = [1.0 / n for _ in range(n)]
         lr = 0.25
         for _ in range(replicator_steps):
-            fitness = bo3_mat @ dist  # Expected Bo3 winrate of each deck against current population
-            avg_fitness = float(np.dot(dist, fitness))
-            # Multiplicative weights / replicator update
-            dist = dist * np.exp(lr * (fitness - avg_fitness))
-            dist = np.clip(dist, 1e-5, None)
-            dist /= dist.sum()
+            fitness = [sum(bo3_mat[i][j] * dist[j] for j in range(n)) for i in range(n)]
+            avg_fitness = sum(dist[i] * fitness[i] for i in range(n))
+            dist = [max(1e-5, dist[i] * math.exp(lr * (fitness[i] - avg_fitness))) for i in range(n)]
+            s_dist = sum(dist)
+            dist = [v / s_dist for v in dist]
 
         nash_weights = {names[i]: round(float(dist[i]), 4) for i in range(n)}
         return NashEquilibriumReport(
             deck_names=names,
-            payoff_matrix_bo3=np.round(bo3_mat, 4),
-            play_matrix=np.round(play_mat, 4),
-            draw_matrix=np.round(draw_mat, 4),
+            payoff_matrix_bo3=bo3_mat,
+            play_matrix=play_mat,
+            draw_matrix=draw_mat,
             nash_weights=nash_weights,
             expected_winrate_vs_current_meta=ev_vs_current,
             best_counter_deck=best_counter,

@@ -13,8 +13,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data_cache"
 CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
 RESULTS_DIR = PROJECT_ROOT / "results"
+LOG_DIR = PROJECT_ROOT / "logs"
 
-for _d in (DATA_DIR, CHECKPOINT_DIR, RESULTS_DIR):
+for _d in (DATA_DIR, CHECKPOINT_DIR, RESULTS_DIR, LOG_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 

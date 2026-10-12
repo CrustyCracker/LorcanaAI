@@ -1,54 +1,41 @@
 [
   {
-    "card_in_name": "Madam Mim - Resourceful Trickster",
-    "card_out_name": "Rapunzel - Letting Down Her Hair",
+    "card_in_name": "Stitch - Rock Star",
+    "card_out_name": "Finnick - Tiny Terror",
     "copies_swapped": 3,
-    "baseline_bo3_winrate": 0.375,
-    "new_bo3_winrate": 0.7408,
-    "delta_bo3_winrate": 0.3658,
-    "play_winrate": 0.6667,
-    "draw_winrate": 0.6667,
-    "games_simulated": 6,
-    "uninkable_count": 5,
-    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+3 Lore na quest) wymuszając niekorzystne wymiany."
-  },
-  {
-    "card_in_name": "Dolores Madrigal - Easy Listener",
-    "card_out_name": "Sid Phillips - Toy Surgeon",
-    "copies_swapped": 3,
-    "baseline_bo3_winrate": 0.375,
-    "new_bo3_winrate": 0.7408,
-    "delta_bo3_winrate": 0.3658,
-    "play_winrate": 0.6667,
-    "draw_winrate": 0.6667,
-    "games_simulated": 6,
-    "uninkable_count": 5,
-    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
-  },
-  {
-    "card_in_name": "Merlin - Completing His Research",
-    "card_out_name": "Sid Phillips - Toy Surgeon",
-    "copies_swapped": 3,
-    "baseline_bo3_winrate": 0.375,
+    "baseline_bo3_winrate": 0.1562,
     "new_bo3_winrate": 0.5,
-    "delta_bo3_winrate": 0.125,
+    "delta_bo3_winrate": 0.3438,
     "play_winrate": 0.6667,
     "draw_winrate": 0.3333,
     "games_simulated": 6,
-    "uninkable_count": 8,
-    "tactical_rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    "uninkable_count": 14,
+    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+3 Lore na quest) wymuszając niekorzystne wymiany."
   },
   {
-    "card_in_name": "Madam Mim - Resourceful Trickster",
-    "card_out_name": "Sid Phillips - Toy Surgeon",
+    "card_in_name": "Stitch - Carefree Surfer",
+    "card_out_name": "Finnick - Tiny Terror",
     "copies_swapped": 3,
-    "baseline_bo3_winrate": 0.375,
-    "new_bo3_winrate": 0.5,
-    "delta_bo3_winrate": 0.125,
+    "baseline_bo3_winrate": 0.1562,
+    "new_bo3_winrate": 0.2592,
+    "delta_bo3_winrate": 0.103,
     "play_winrate": 0.3333,
-    "draw_winrate": 0.6667,
+    "draw_winrate": 0.3333,
     "games_simulated": 6,
-    "uninkable_count": 5,
-    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+3 Lore na quest) wymuszając niekorzystne wymiany."
+    "uninkable_count": 14,
+    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+  },
+  {
+    "card_in_name": "Stitch - Carefree Surfer",
+    "card_out_name": "Mickey Mouse - Expedition Leader",
+    "copies_swapped": 3,
+    "baseline_bo3_winrate": 0.1562,
+    "new_bo3_winrate": 0.2222,
+    "delta_bo3_winrate": 0.066,
+    "play_winrate": 0.6667,
+    "draw_winrate": 0.0,
+    "games_simulated": 6,
+    "uninkable_count": 14,
+    "tactical_rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
   }
 ]

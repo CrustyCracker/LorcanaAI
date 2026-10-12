@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 from typing import Iterable
-import requests
 
 from lorcana_ai.config import DATA_DIR, ClusterConfig, EngineConfig
 from lorcana_ai.data.effect_dsl import (
@@ -189,11 +188,13 @@ class CardDatabase:
 
     def sync_from_lorcana_json(self, url: str | None = None, timeout: int = 30) -> int:
         """Downloads latest allCards.json from LorcanaJSON and loads Sets 9-14 Core Constructed cards."""
+        import urllib.request
+
         target_url = url or ClusterConfig().lorcana_json_url
         cache_file = DATA_DIR / "allCards.json"
-        resp = requests.get(target_url, timeout=timeout)
-        resp.raise_for_status()
-        cache_file.write_bytes(resp.content)
+        req = urllib.request.Request(target_url, headers={"User-Agent": "LorcanaAlpha/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            cache_file.write_bytes(resp.read())
         return self.load_from_lorcana_json_file(cache_file)
 
     def load_from_lorcana_json_file(self, path: Path) -> int:

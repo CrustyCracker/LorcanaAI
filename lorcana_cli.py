@@ -9,9 +9,9 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import time
 
-from lorcana_ai.agents.trainer import SelfPlayTrainer
-from lorcana_ai.config import CHECKPOINT_DIR, PROJECT_ROOT, RESULTS_DIR, MCTSConfig
+from lorcana_ai.config import CHECKPOINT_DIR, LOG_DIR, PROJECT_ROOT, RESULTS_DIR, MCTSConfig
 from lorcana_ai.data.card_db import GLOBAL_CARD_DB
 from lorcana_ai.data.deck_io import Deck
 from lorcana_ai.data.meta_decks import (
@@ -26,6 +26,26 @@ from lorcana_ai.deckbuilder.evolutionary_map import MAPElitesDeckbuilder
 from lorcana_ai.deckbuilder.nash_solver import NashMetaSolver
 from lorcana_ai.deckbuilder.tech_scanner import TechCardScanner
 from lorcana_ai.engine.simulator import HAS_RUST_ENGINE
+
+
+class _TeeLogger:
+    """Mirrors stdout/stderr to both console and a file inside logs/."""
+
+    def __init__(self, stream, log_file_path: Path) -> None:
+        self._stream = stream
+        self._log_file = log_file_path.open("a", encoding="utf-8", buffering=1)
+
+    def write(self, data: str) -> int:
+        self._stream.write(data)
+        self._log_file.write(data)
+        return len(data)
+
+    def flush(self) -> None:
+        self._stream.flush()
+        self._log_file.flush()
+
+    def __getattr__(self, attr: str):
+        return getattr(self._stream, attr)
 
 
 def cmd_sync_cards(_args: argparse.Namespace) -> None:
@@ -179,6 +199,8 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
 
 
 def cmd_train(args: argparse.Namespace) -> None:
+    from lorcana_ai.agents.trainer import SelfPlayTrainer
+
     print(f"[LorcanaAlpha] Starting Self-Play RL Trainer (Rust Engine Active: {HAS_RUST_ENGINE})")
     mcts_cfg = MCTSConfig(
         num_determinizations=args.determinizations,
@@ -207,10 +229,20 @@ def cmd_train(args: argparse.Namespace) -> None:
 
 def cmd_scan_tech(args: argparse.Namespace) -> None:
     decks = get_reference_meta_decks()
-    my_deck = decks.get(args.my_deck) or next(
-        (d for k, d in decks.items() if args.my_deck.lower() in k.lower()),
-        list(decks.values())[0],
-    )
+    core_counts, baseline_deck = get_archetype_core_and_baseline(args.my_deck)
+    locked_ids = set(core_counts.keys()) if core_counts else set()
+
+    opt_slug = "princess_aggro" if "princess" in args.my_deck.lower() else ("circle_of_life" if "circle" in args.my_deck.lower() else "")
+    opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
+    if opt_file and opt_file.exists():
+        my_deck = Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{args.my_deck} (Optimized)")
+    elif baseline_deck is not None:
+        my_deck = baseline_deck
+    else:
+        my_deck = decks.get(args.my_deck) or next(
+            (d for k, d in decks.items() if args.my_deck.lower() in k.lower()),
+            list(decks.values())[0],
+        )
     opp_deck = decks.get(args.opp_deck) or next(
         (d for k, d in decks.items() if args.opp_deck.lower() in k.lower()),
         list(decks.values())[1],
@@ -224,6 +256,7 @@ def cmd_scan_tech(args: argparse.Namespace) -> None:
         copies_to_swap=args.copies,
         total_simulation_budget=args.budget,
         top_k=args.top_k,
+        locked_core_ids=locked_ids,
     )
 
     print("\n" + "=" * 95)
@@ -356,6 +389,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = build_parser()
     args = parser.parse_args(argv)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOG_DIR / f"{args.command.replace('-', '_')}.log"
+    sys.stdout = _TeeLogger(sys.stdout, log_path)
+    print(f"[Log] Zapisywanie logów do: {log_path}")
     if args.command == "sync-cards":
         cmd_sync_cards(args)
     elif args.command == "sync-meta":

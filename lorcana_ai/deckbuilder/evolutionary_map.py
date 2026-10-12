@@ -15,7 +15,12 @@ from lorcana_ai.data.card_db import CardDatabase, GLOBAL_CARD_DB, INK_COLORS
 from lorcana_ai.data.deck_io import Deck
 from lorcana_ai.data.meta_decks import DEFAULT_METAGAME_SHARES, get_reference_meta_decks
 from lorcana_ai.deckbuilder.matchup_evaluator import MatchupEvaluator
-from lorcana_ai.engine.vectorizer import INK_PAIRS
+
+INK_PAIRS: list[str] = [
+    f"{INK_COLORS[i]}/{INK_COLORS[j]}"
+    for i in range(len(INK_COLORS))
+    for j in range(i + 1, len(INK_COLORS))
+]
 
 
 @dataclass

@@ -11,7 +11,6 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-import requests
 
 from lorcana_ai.config import DATA_DIR, PROJECT_ROOT
 from lorcana_ai.data.card_db import CardDatabase, GLOBAL_CARD_DB
@@ -67,13 +66,19 @@ def sync_duels_ink_meta(
     https://duels.ink/stats/core-bo1 (via /api/stats/meta), caches the JSON in data_cache/,
     and optionally exports Dreamborn-format .txt decklists into decks/duels_ink_core_bo1/.
     """
-    params = {"queue": queue, "period": period, "era": era}
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LorcanaAlpha/1.0"}
-    resp = requests.get(DUELS_INK_META_API, params=params, headers=headers, timeout=timeout)
-    resp.raise_for_status()
+    import urllib.parse
+    import urllib.request
+
+    query = urllib.parse.urlencode({"queue": queue, "period": period, "era": era})
+    req = urllib.request.Request(
+        f"{DUELS_INK_META_API}?{query}",
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LorcanaAlpha/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw_text = resp.read().decode("utf-8")
 
     cache_path = DATA_DIR / f"duels_ink_{queue.replace('-', '_')}.json"
-    cache_path.write_text(resp.text, encoding="utf-8")
+    cache_path.write_text(raw_text, encoding="utf-8")
 
     profiles = load_duels_ink_profiles(
         cache_path=cache_path,
