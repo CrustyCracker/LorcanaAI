@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=lorcana_deck_evo
 #SBATCH --partition=plgrid-gpu-a100
-#SBATCH --account=plglorcana-gpu-a100
+#SBATCH --account=plgvideocnn0-gpu-a100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
 #SBATCH --time=12:00:00
@@ -21,10 +21,16 @@ mkdir -p logs checkpoints results
 module purge || true
 module load GCCcore/12.3.0 Python/3.11.3 CUDA/12.1.1 || true
 
-VENV_DIR="${SCRATCH:-$HOME}/lorcana_alpha_venv"
-source "${VENV_DIR}/bin/activate"
+if [ -f venv/bin/activate ]; then
+    source venv/bin/activate
+elif [ -f venv_athena/bin/activate ]; then
+    source venv_athena/bin/activate
+elif [ -f "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate" ]; then
+    source "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate"
+fi
 
-export RAYON_NUM_THREADS=${SLURM_CPUS_PER_TASK:-64}
+export RAYON_NUM_THREADS=${SLURM_CPUS_PER_TASK:-16}
+export PYTHONIOENCODING=utf-8
 
 echo "[1/3] Uruchamianie ewolucji talii MAP-Elites na ${RAYON_NUM_THREADS} wątkach EPYC..."
 python lorcana_cli.py evolve --generations 40 --offspring 16 --games 32
