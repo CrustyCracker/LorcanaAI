@@ -14,14 +14,23 @@
 set -e
 mkdir -p logs results checkpoints decks
 
-module purge
-module load GCCcore/12.3.0 Python/3.11.3 CUDA/12.1.1 Rust/1.75.0 2>/dev/null || true
+module purge 2>/dev/null || true
+module load GCCcore/12.3.0 2>/dev/null || true
+module load Python/3.11.3 2>/dev/null || module load Python/3.11.3-GCCcore-12.3.0 2>/dev/null || module load Python 2>/dev/null || true
+module load CUDA/12.1.1 2>/dev/null || true
 
 if [ -f venv/bin/activate ]; then
     source venv/bin/activate
 elif [ -f venv_athena/bin/activate ]; then
     source venv_athena/bin/activate
+elif [ -f "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate" ]; then
+    source "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate"
 fi
+
+# Automatically resolve and export the directory containing libpython3.11.so.1.0
+PY_REAL=$(readlink -f "$(which python3)")
+PY_LIB_DIR="$(dirname "$(dirname "$PY_REAL")")/lib"
+export LD_LIBRARY_PATH="${PY_LIB_DIR}:${LD_LIBRARY_PATH}"
 export RAYON_NUM_THREADS=16
 export OMP_NUM_THREADS=8
 export PYTHONIOENCODING=utf-8

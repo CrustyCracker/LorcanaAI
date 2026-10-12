@@ -18,8 +18,10 @@
 
 mkdir -p logs checkpoints results
 
-module purge || true
-module load GCCcore/12.3.0 Python/3.11.3 CUDA/12.1.1 || true
+module purge 2>/dev/null || true
+module load GCCcore/12.3.0 2>/dev/null || true
+module load Python/3.11.3 2>/dev/null || module load Python/3.11.3-GCCcore-12.3.0 2>/dev/null || module load Python 2>/dev/null || true
+module load CUDA/12.1.1 2>/dev/null || true
 
 if [ -f venv/bin/activate ]; then
     source venv/bin/activate
@@ -29,6 +31,9 @@ elif [ -f "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate" ]; then
     source "${SCRATCH:-$HOME}/lorcana_alpha_venv/bin/activate"
 fi
 
+PY_REAL=$(readlink -f "$(which python3)")
+PY_LIB_DIR="$(dirname "$(dirname "$PY_REAL")")/lib"
+export LD_LIBRARY_PATH="${PY_LIB_DIR}:${LD_LIBRARY_PATH}"
 export RAYON_NUM_THREADS=${SLURM_CPUS_PER_TASK:-16}
 export PYTHONIOENCODING=utf-8
 
