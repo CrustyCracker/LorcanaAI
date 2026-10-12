@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""
+Command-Line Interface (CLI) for LorcanaAlpha.
+Used both locally on Windows/Linux and inside SLURM batch jobs on PLGrid Athena.
+"""
+
+from __future__ import annotations
+import argparse
+import json
+from pathlib import Path
+import sys
+
+from lorcana_ai.agents.trainer import SelfPlayTrainer
+from lorcana_ai.config import CHECKPOINT_DIR, PROJECT_ROOT, RESULTS_DIR, MCTSConfig
+from lorcana_ai.data.card_db import GLOBAL_CARD_DB
+from lorcana_ai.data.deck_io import Deck
+from lorcana_ai.data.meta_decks import (
+    DEFAULT_METAGAME_SHARES,
+    EXPORTED_DECKS_DIR,
+    get_circle_of_life_core_counts,
+    get_metagame_shares,
+    get_reference_meta_decks,
+    sync_duels_ink_meta,
+)
+from lorcana_ai.deckbuilder.evolutionary_map import MAPElitesDeckbuilder
+from lorcana_ai.deckbuilder.nash_solver import NashMetaSolver
+from lorcana_ai.deckbuilder.tech_scanner import TechCardScanner
+from lorcana_ai.engine.simulator import HAS_RUST_ENGINE
+
+
+def cmd_sync_cards(_args: argparse.Namespace) -> None:
+    print("[LorcanaAlpha] Synchronizing card database from LorcanaJSON...")
+    try:
+        added = GLOBAL_CARD_DB.sync_from_lorcana_json()
+        print(f"[OK] Added {added} new cards from LorcanaJSON. Total registered cards: {len(GLOBAL_CARD_DB.by_id)}")
+    except Exception as exc:
+        print(f"[WARN] Could not reach LorcanaJSON ({exc}). Using built-in Core Constructed card database ({len(GLOBAL_CARD_DB.by_id)} cards).")
+
+
+def cmd_sync_meta(args: argparse.Namespace) -> None:
+    print(f"[LorcanaAlpha] Scraping Core Set 14 metagame from https://duels.ink/stats/{args.queue} ...")
+    profiles = sync_duels_ink_meta(queue=args.queue, period=args.period, era=args.era, export_txt_files=True)
+    print("\n" + "=" * 95)
+    print(f"SCRAPED DUELS.INK META ARCHETYPES ({args.queue.upper()} | Era: {args.era} | Period: {args.period})")
+    print("=" * 95)
+    for idx, prof in enumerate(profiles[:15], 1):
+        sigs = ", ".join(prof.signature_cards[:3])
+        print(
+            f"{idx:2d}. {prof.name:<34} | Games: {prof.games_played:5d} | "
+            f"Winrate: {prof.win_rate:5.2f}% | Share: {prof.meta_share*100:5.1f}% | Key: {sigs}"
+        )
+    print("=" * 95)
+    print(f"[OK] Exported {len(profiles)} Dreamborn-format .txt decklists to {EXPORTED_DECKS_DIR}")
+
+
+def cmd_optimize_core(args: argparse.Namespace) -> None:
+    if args.core_file and Path(args.core_file).exists():
+        raw_text = Path(args.core_file).read_text(encoding="utf-8")
+        core_deck = Deck.from_dreamborn_text(raw_text, name=args.archetype)
+        core_counts = dict(core_deck.card_counts)
+    else:
+        core_counts = get_circle_of_life_core_counts()
+
+    meta_decks = get_reference_meta_decks(top_n=args.top_meta)
+    meta_shares = get_metagame_shares(top_n=args.top_meta)
+
+    locked_total = sum(core_counts.values())
+    flex_slots = max(0, 60 - locked_total)
+    print(
+        f"[LorcanaAlpha] Optimizing {flex_slots} Flex/Tech Slots around {locked_total}-Card Locked Core "
+        f"for '{args.archetype}' vs Top {len(meta_decks)} Duels.ink Meta Decks "
+        f"(games_per_matchup={args.games}, packages={args.packages})..."
+    )
+
+    scanner = TechCardScanner()
+    report = scanner.optimize_core_for_duels_ink_meta(
+        core_card_counts=core_counts,
+        meta_decks=meta_decks,
+        meta_shares=meta_shares,
+        archetype_name=args.archetype,
+        games_per_matchup=args.games,
+        package_candidates=args.packages,
+        seed=args.seed,
+    )
+
+    print("\n" + "=" * 100)
+    print(f"RANKING KART TECHOWYCH DLA: {report.archetype_name} (vs Duels.ink Core Set 14 Meta)")
+    print("=" * 100)
+    for idx, te in enumerate(report.top_tech_cards[:10], 1):
+        ink_str = "Inkable" if te.inkable else "Uninkable"
+        print(
+            f"{idx:2d}. {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {te.recommended_copies}x\n"
+            f"    Expected BO1 WR: {te.expected_bo1_winrate*100:.1f}% | BO3 WR: {te.expected_bo3_winrate*100:.1f}% | "
+            f"Play: {te.play_winrate*100:.1f}% | Draw: {te.draw_winrate*100:.1f}% | Najlepsza na: {te.best_against}\n"
+            f"    Rola: {te.tactical_role}"
+        )
+
+    print("\n" + "=" * 100)
+    print(
+        f"OPTYMALNY PAKIET {report.flex_slots_count} KART TECH/FLEX "
+        f"(BO1 Meta WR: {report.optimized_meta_bo1_wr*100:.1f}% [baza {report.baseline_meta_bo1_wr*100:.1f}%] | "
+        f"BO3 Meta WR: {report.optimized_meta_bo3_wr*100:.1f}% [baza {report.baseline_meta_bo3_wr*100:.1f}%])"
+    )
+    print("=" * 100)
+    for cname, cnt in report.selected_flex_package.items():
+        print(f"  + {cnt}x {cname}")
+
+    print("-" * 100)
+    print("WYNIKI W POSZCZEGÓLNYCH MATCHUPACH NA DUELS.INK (CORE SET 14):")
+    for opp_name, m_info in report.matchup_breakdown.items():
+        print(
+            f"  vs {opp_name:<34} (Share: {m_info['meta_share']*100:4.1f}%) -> "
+            f"BO1: {m_info['bo1_winrate']*100:5.1f}% | BO3: {m_info['bo3_winrate']*100:5.1f}% | "
+            f"Play: {m_info['play_winrate']*100:5.1f}% | Draw: {m_info['draw_winrate']*100:5.1f}%"
+        )
+
+    print("-" * 100)
+    print(
+        f"GOTOWA TALIA 60 KART ({report.optimized_deck.name} | "
+        f"Uninkables: {report.optimized_deck.uninkable_count} | Avg Cost: {report.optimized_deck.average_cost:.2f}):"
+    )
+    print(report.optimized_deck.to_dreamborn_text())
+    print("=" * 100)
+
+    deck_out_path = PROJECT_ROOT / "decks" / "amber_emerald_circle_of_life_optimized.txt"
+    deck_out_path.parent.mkdir(parents=True, exist_ok=True)
+    deck_out_path.write_text(report.optimized_deck.to_dreamborn_text() + "\n", encoding="utf-8")
+
+    json_out_path = RESULTS_DIR / "circle_of_life_optimized_report.json"
+    json_payload = {
+        "archetype_name": report.archetype_name,
+        "locked_core_count": report.locked_core_count,
+        "flex_slots_count": report.flex_slots_count,
+        "baseline_meta_bo1_wr": report.baseline_meta_bo1_wr,
+        "baseline_meta_bo3_wr": report.baseline_meta_bo3_wr,
+        "optimized_meta_bo1_wr": report.optimized_meta_bo1_wr,
+        "optimized_meta_bo3_wr": report.optimized_meta_bo3_wr,
+        "optimized_play_wr": report.optimized_play_wr,
+        "optimized_draw_wr": report.optimized_draw_wr,
+        "selected_flex_package": report.selected_flex_package,
+        "top_tech_cards": [te.__dict__ for te in report.top_tech_cards],
+        "matchup_breakdown": report.matchup_breakdown,
+        "dreamborn_decklist": report.optimized_deck.to_dreamborn_text(),
+    }
+    json_out_path.write_text(json.dumps(json_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"[OK] Zapisano gotową talię do: {deck_out_path}")
+    print(f"[OK] Zapisano pełny raport JSON do: {json_out_path}")
+
+
+def cmd_train(args: argparse.Namespace) -> None:
+    print(f"[LorcanaAlpha] Starting Self-Play RL Trainer (Rust Engine Active: {HAS_RUST_ENGINE})")
+    mcts_cfg = MCTSConfig(
+        num_determinizations=args.determinizations,
+        simulations_per_determinization=args.simulations,
+    )
+    trainer = SelfPlayTrainer(mcts_cfg=mcts_cfg, lr=args.lr)
+    print(f"[LorcanaAlpha] Device: {trainer.device} | Starting from completed_epochs={trainer.completed_epochs}")
+
+    for ep in range(args.epochs):
+        metrics = trainer.train_epoch(
+            games_per_epoch=args.games_per_epoch,
+            batch_size=args.batch_size,
+            use_mcts=args.use_mcts,
+        )
+        print(
+            f"Epoch {metrics['epoch']:04d} | "
+            f"Policy Loss: {metrics['policy_loss']:.4f} | "
+            f"Value Loss: {metrics['value_loss']:.4f} | "
+            f"Belief Loss: {metrics['belief_loss']:.4f} | "
+            f"Avg Turns: {metrics['avg_game_turns']:.1f} | "
+            f"Buffer: {metrics['buffer_size']} | "
+            f"Time: {metrics['elapsed_sec']}s"
+        )
+    print(f"[OK] Checkpoint saved to {CHECKPOINT_DIR / 'latest_agent.pt'}")
+
+
+def cmd_scan_tech(args: argparse.Namespace) -> None:
+    decks = get_reference_meta_decks()
+    my_deck = decks.get(args.my_deck) or next(
+        (d for k, d in decks.items() if args.my_deck.lower() in k.lower()),
+        list(decks.values())[0],
+    )
+    opp_deck = decks.get(args.opp_deck) or next(
+        (d for k, d in decks.items() if args.opp_deck.lower() in k.lower()),
+        list(decks.values())[1],
+    )
+
+    print(f"[LorcanaAlpha] Scanning Tech-Cards for '{my_deck.name}' vs '{opp_deck.name}'...")
+    scanner = TechCardScanner()
+    recs = scanner.scan_for_matchup(
+        base_deck=my_deck,
+        opponent_deck=opp_deck,
+        copies_to_swap=args.copies,
+        total_simulation_budget=args.budget,
+        top_k=args.top_k,
+    )
+
+    print("\n" + "=" * 95)
+    print(f"TOP TECH-CARD RECOMMENDATIONS: {my_deck.name}  vs  {opp_deck.name}")
+    print("=" * 95)
+    for idx, r in enumerate(recs, 1):
+        sign = "+" if r.delta_bo3_winrate >= 0 else ""
+        print(
+            f"{idx}. +{r.copies_swapped}x {r.card_in_name} (zamiast {r.card_out_name})\n"
+            f"   Bo3 Winrate: {r.new_bo3_winrate*100:.1f}% ({sign}{r.delta_bo3_winrate*100:.1f}% vs baza {r.baseline_bo3_winrate*100:.1f}%) | "
+            f"Play: {r.play_winrate*100:.1f}% | Draw: {r.draw_winrate*100:.1f}% | Uninkables: {r.uninkable_count}\n"
+            f"   Uzasadnienie: {r.tactical_rationale}"
+        )
+
+    solver = NashMetaSolver()
+    mull = solver.generate_mulligan_guide(my_deck, opp_deck, games_per_strategy=12)
+    print("-" * 95)
+    print(f"REKOMENDACJA MULLIGANU ({my_deck.name} vs {opp_deck.name}):")
+    print(f"  * Gdy zaczynasz (On the Play): {mull.best_strategy_on_play}")
+    print(f"  * Gdy drugi (On the Draw):     {mull.best_strategy_on_draw}")
+    print(f"  * Priorytetowe karty na rękę:  {', '.join(mull.priority_keep_cards)}")
+    print("=" * 95)
+
+    out_path = RESULTS_DIR / "latest_tech_scan.json"
+    out_path.write_text(
+        json.dumps([r.__dict__ for r in recs], indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(f"[OK] Saved detailed tech scan report to {out_path}")
+
+
+def cmd_evolve(args: argparse.Namespace) -> None:
+    print(f"[LorcanaAlpha] Running MAP-Elites Coevolution Deckbuilder (Generations={args.generations})...")
+    builder = MAPElitesDeckbuilder()
+    cells = builder.run_evolution(
+        generations=args.generations,
+        offspring_per_gen=args.offspring,
+        games_per_matchup=args.games,
+    )
+
+    print("\n" + "=" * 95)
+    print("TOP DISCOVERED / EVOLVED ARCHETYPES (MAP-Elites Archive)")
+    print("=" * 95)
+    for idx, cell in enumerate(cells[:8], 1):
+        print(
+            f"{idx}. {cell.deck.name} [{cell.ink_pair} - {cell.style_profile}]\n"
+            f"   Expected Meta Bo3 Winrate: {cell.expected_meta_winrate*100:.1f}% | "
+            f"Play: {cell.play_winrate*100:.1f}% | Draw: {cell.draw_winrate*100:.1f}% | "
+            f"Avg Cost: {cell.deck.average_cost:.2f} | Uninkables: {cell.deck.uninkable_count}"
+        )
+    print(f"\n[OK] Saved full MAP-Elites deck archive to {RESULTS_DIR / 'map_elites_archive.json'}")
+
+
+def cmd_nash_meta(args: argparse.Namespace) -> None:
+    print("[LorcanaAlpha] Computing Bo3 Metagame Payoff Matrix & Nash Equilibrium...")
+    decks = list(get_reference_meta_decks().values())
+    solver = NashMetaSolver()
+    report = solver.solve_metagame(
+        decks=decks,
+        current_meta_shares=DEFAULT_METAGAME_SHARES,
+        games_per_pair=args.games,
+    )
+
+    print("\n" + "=" * 95)
+    print("NASH EQUILIBRIUM METAGAME SOLVER REPORT (Best-of-3 Tournament Rules)")
+    print("=" * 95)
+    for nm in report.deck_names:
+        ev = report.expected_winrate_vs_current_meta[nm] * 100
+        nw = report.nash_weights[nm] * 100
+        cur = DEFAULT_METAGAME_SHARES.get(nm, 0.0) * 100
+        print(f"  {nm:<34} | Meta Share: {cur:5.1f}% | EV Bo3 Winrate: {ev:5.1f}% | Nash Weight: {nw:5.1f}%")
+    print("-" * 95)
+    print(f"Najlepsza talia na obecny turniej (Best Counter Deck): {report.best_counter_deck}")
+    print("=" * 95)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="LorcanaAlpha CLI: AI Agent & Evolutionary Deckbuilder")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("sync-cards", help="Download and cache latest LorcanaJSON card database")
+
+    p_meta = sub.add_parser("sync-meta", help="Scrape Core Set 14 meta decks and stats from https://duels.ink/stats/core-bo1")
+    p_meta.add_argument("--queue", type=str, default="core-bo1", help="Duels.ink queue ID (e.g. core-bo1, core-bo3)")
+    p_meta.add_argument("--period", type=str, default="all_time", help="Time period (all_time or week)")
+    p_meta.add_argument("--era", type=str, default="set14", help="Era identifier (default: set14)")
+
+    p_opt = sub.add_parser(
+        "optimize-core",
+        help="Find the best tech cards and 16-card flex package around the 44-card Amber/Emerald Circle of Life core vs Duels.ink meta",
+    )
+    p_opt.add_argument("--archetype", type=str, default="Amber/Emerald Circle of Life")
+    p_opt.add_argument("--core-file", type=str, default="", help="Optional path to custom core .txt file")
+    p_opt.add_argument("--top-meta", type=int, default=8, help="Number of top Duels.ink meta decks in gauntlet")
+    p_opt.add_argument("--games", type=int, default=16, help="Games simulated per matchup")
+    p_opt.add_argument("--packages", type=int, default=8, help="Number of candidate 16-card flex packages to evaluate")
+    p_opt.add_argument("--seed", type=int, default=2026)
+
+    p_train = sub.add_parser("train", help="Run Self-Play RL & Opponent Belief Network training")
+    p_train.add_argument("--epochs", type=int, default=5)
+    p_train.add_argument("--games-per-epoch", type=int, default=6)
+    p_train.add_argument("--batch-size", type=int, default=32)
+    p_train.add_argument("--lr", type=float, default=3e-4)
+    p_train.add_argument("--determinizations", type=int, default=4)
+    p_train.add_argument("--simulations", type=int, default=12)
+    p_train.add_argument("--use-mcts", action="store_true", help="Enable full IS-MCTS during self-play")
+
+    p_scan = sub.add_parser("scan-tech", help="Run UCB1 Tech-Card Scanner for a specific matchup")
+    p_scan.add_argument("--my-deck", type=str, default="Amber/Emerald Circle of Life")
+    p_scan.add_argument("--opp-deck", type=str, default="Emerald/Steel Midrange")
+    p_scan.add_argument("--copies", type=int, default=3)
+    p_scan.add_argument("--budget", type=int, default=96)
+    p_scan.add_argument("--top-k", type=int, default=5)
+
+    p_evol = sub.add_parser("evolve", help="Discover and evolve new decks using MAP-Elites")
+    p_evol.add_argument("--generations", type=int, default=3)
+    p_evol.add_argument("--offspring", type=int, default=4)
+    p_evol.add_argument("--games", type=int, default=6)
+
+    p_nash = sub.add_parser("nash-meta", help="Solve Bo3 metagame Nash Equilibrium")
+    p_nash.add_argument("--games", type=int, default=12)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command == "sync-cards":
+        cmd_sync_cards(args)
+    elif args.command == "sync-meta":
+        cmd_sync_meta(args)
+    elif args.command == "optimize-core":
+        cmd_optimize_core(args)
+    elif args.command == "train":
+        cmd_train(args)
+    elif args.command == "scan-tech":
+        cmd_scan_tech(args)
+    elif args.command == "evolve":
+        cmd_evolve(args)
+    elif args.command == "nash-meta":
+        cmd_nash_meta(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

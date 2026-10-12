@@ -1,0 +1,74 @@
+[
+  {
+    "ink_pair": "Amethyst/Ruby",
+    "style_profile": "Control",
+    "deck_name": "AI Amethyst/Ruby (Control v0)",
+    "expected_meta_winrate": 0.3021,
+    "play_winrate": 0.3503,
+    "draw_winrate": 0.2539,
+    "uninkable_count": 15,
+    "average_cost": 4.15,
+    "generation_found": 0,
+    "matchup_breakdown": {
+      "Amber/Emerald Circle of Life": 0.0,
+      "Amber/Emerald Princess Aggro": 1.0,
+      "Amber/Sapphire Control": 0.0,
+      "Emerald/Steel Midrange": 0.0,
+      "Amber/Sapphire Detectives": 0.0,
+      "Amethyst/Steel Midrange": 0.5,
+      "Emerald/Sapphire Mouse House": 1.0,
+      "Amber/Amethyst Midrange": 0.0,
+      "Amethyst/Emerald Retro Device": 0.0,
+      "Amber/Ruby Leviathan Circle": 1.0
+    },
+    "decklist": "2 Mother Gothel - Underhanded Schemer\n4 Mr. Incredible - Bob Parr\n4 Pterodactyl Janie Doll - Sid's Toy\n4 HeiHei - Created by the Vine\n1 Simba - Scrappy Cub\n2 Super Suit\n2 Dumbo - The Flying Elephant\n2 Hermes - Harried Messenger\n3 Mickey Mouse - Brave Little Prince\n3 Leviathan's Lair - Dangerous Ground\n3 Moana - Undeterred Voyager\n4 Nibs - Lost Boy\n2 Source of the Vine\n3 Jasper - Dodgy Boater\n4 Queen of Hearts - Sensing Weakness\n3 Fflewddur Fflam - Luckless Bard\n2 Pegasus - Searching High and Low\n3 Rapunzel - Letting Down Her Hair\n4 Magica De Spell - Conniving Sorceress\n2 I2I\n3 Maleficent - Monstrous Dragon"
+  },
+  {
+    "ink_pair": "Ruby/Sapphire",
+    "style_profile": "Control",
+    "deck_name": "AI Ruby/Sapphire (Control v1)",
+    "expected_meta_winrate": 0.1367,
+    "play_winrate": 0.2416,
+    "draw_winrate": 0.0318,
+    "uninkable_count": 17,
+    "average_cost": 3.18,
+    "generation_found": 1,
+    "matchup_breakdown": {
+      "Amber/Emerald Circle of Life": 0.0,
+      "Amber/Emerald Princess Aggro": 0.0,
+      "Amber/Sapphire Control": 0.5,
+      "Emerald/Steel Midrange": 0.0,
+      "Amber/Sapphire Detectives": 0.0,
+      "Amethyst/Steel Midrange": 0.5,
+      "Emerald/Sapphire Mouse House": 0.0,
+      "Amber/Amethyst Midrange": 0.0,
+      "Amethyst/Emerald Retro Device": 0.0,
+      "Amber/Ruby Leviathan Circle": 1.0
+    },
+    "decklist": "2 Donald Duck - Nephew Fred\n4 Duchess - Cosmopolitan Cat\n4 Inner Strength\n2 Prototype Chem Ball\n4 The Sultan - Playful Monarch\n4 Lafayette - All Ears\n4 Medallion Weights\n3 Mickey Mouse - Bob Cratchit\n4 Shepherd's Journal\n3 Ernesto de la Cruz - Idol of Millions\n4 Kida - Discovering the Unknown\n2 Splodyhead - Experiment 619\n1 Héctor Rivera - Gone to Pieces\n2 Ichabod Crane - Bookish Schoolmaster\n2 Colonel Hathi - On the March\n4 Dragon Fire\n2 Goofy - Dancing Superstar\n3 Isabela Madrigal - Perfectly in Control\n2 Baymax - Amped Up\n2 Belle & Beast - Certain as the Sun\n2 Olaf - Snowman of Action"
+  },
+  {
+    "ink_pair": "Ruby/Sapphire",
+    "style_profile": "Aggro",
+    "deck_name": "AI Ruby/Sapphire (Aggro v1)",
+    "expected_meta_winrate": 0.0885,
+    "play_winrate": 0.0318,
+    "draw_winrate": 0.1452,
+    "uninkable_count": 17,
+    "average_cost": 2.97,
+    "generation_found": 1,
+    "matchup_breakdown": {
+      "Amber/Emerald Circle of Life": 0.0,
+      "Amber/Emerald Princess Aggro": 0.0,
+      "Amber/Sapphire Control": 0.5,
+      "Emerald/Steel Midrange": 0.0,
+      "Amber/Sapphire Detectives": 0.0,
+      "Amethyst/Steel Midrange": 0.0,
+      "Emerald/Sapphire Mouse House": 0.0,
+      "Amber/Amethyst Midrange": 0.0,
+      "Amethyst/Emerald Retro Device": 0.0,
+      "Amber/Ruby Leviathan Circle": 1.0
+    },
+    "decklist": "2 Blinding Chem Ball\n4 Duchess - Cosmopolitan Cat\n4 Inner Strength\n4 Prototype Chem Ball\n4 The Sultan - Playful Monarch\n1 Lafayette - All Ears\n4 Medallion Weights\n3 Mickey Mouse - Bob Cratchit\n4 Shepherd's Journal\n3 Ernesto de la Cruz - Idol of Millions\n4 Kida - Discovering the Unknown\n3 Morty Fieldmouse - Tiny Tim\n2 Ranger Plane\n2 Splodyhead - Experiment 619\n1 Héctor Rivera - Gone to Pieces\n2 Ichabod Crane - Bookish Schoolmaster\n2 Colonel Hathi - On the March\n4 Dragon Fire\n3 Isabela Madrigal - Perfectly in Control\n2 Belle & Beast - Certain as the Sun\n2 Olaf - Snowman of Action"
+  }
+]

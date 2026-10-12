@@ -1,0 +1,23 @@
+[package]
+name = "lorcana_rs"
+version = "0.1.0"
+edition = "2021"
+description = "High-throughput native Rust game simulator & parallel MCTS rollout engine for LorcanaAlpha on PLGrid Athena"
+
+[lib]
+name = "lorcana_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21", features = ["extension-module"] }
+rayon = "1.10"
+rand = "0.8"
+rand_pcg = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"

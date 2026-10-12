@@ -1,0 +1,19 @@
+# Python & Rust build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.dll
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+target/
+venv/
+venv_athena/
+.env
+
+# Logs & temporary runtime outputs (keep data_cache/ and decks/ in git so Athena works offline!)
+logs/
+checkpoints/*.pt

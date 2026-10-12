@@ -1,0 +1,349 @@
+{
+  "archetype_name": "Amber/Emerald Circle of Life",
+  "locked_core_count": 44,
+  "flex_slots_count": 16,
+  "baseline_meta_bo1_wr": 0.5308,
+  "baseline_meta_bo3_wr": 0.5657,
+  "optimized_meta_bo1_wr": 0.5836,
+  "optimized_meta_bo3_wr": 0.6215,
+  "optimized_play_wr": 0.5409,
+  "optimized_draw_wr": 0.6264,
+  "selected_flex_package": {
+    "Max Goof - Chart Topper": 3,
+    "Lenny - Toy Binoculars": 3,
+    "Ursula - Deceiver": 3,
+    "Chernabog - Unnatural Force": 3,
+    "Stitch - Carefree Surfer": 2,
+    "White Rabbit - Late Again": 2
+  },
+  "top_tech_cards": [
+    {
+      "card_name": "Don Karnage - Debonair Pirate",
+      "card_id": 1112,
+      "cost": 6,
+      "inkable": false,
+      "card_type": "Character",
+      "recommended_copies": 2,
+      "expected_bo1_winrate": 0.5498,
+      "expected_bo3_winrate": 0.5756,
+      "play_winrate": 0.4924,
+      "draw_winrate": 0.6071,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.625,
+        "Amber/Emerald Princess Aggro": 0.625,
+        "Amber/Sapphire Control": 0.5,
+        "Emerald/Steel Midrange": 0.3125,
+        "Amber/Sapphire Detectives": 0.375,
+        "Amethyst/Steel Midrange": 0.6875,
+        "Emerald/Sapphire Mouse House": 0.6875
+      },
+      "best_against": "Amethyst/Steel Midrange",
+      "tactical_role": "Shift 4 (3/6, 2 Lore): przy wejściu zadaje 1 obrażenie wszystkim postaciom rywala (ignorując Resist!) — uruchamia masowe wygnanie z 'Prince Phillip - Vanquisher of Foes' i obniża Lore zranionych wrogów o -1."
+    },
+    {
+      "card_name": "Stitch - Carefree Surfer",
+      "card_id": 25,
+      "cost": 7,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.551,
+      "expected_bo3_winrate": 0.5616,
+      "play_winrate": 0.5873,
+      "draw_winrate": 0.5148,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.875,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.25,
+        "Amber/Sapphire Detectives": 0.625,
+        "Amethyst/Steel Midrange": 0.3125,
+        "Emerald/Sapphire Mouse House": 0.4375
+      },
+      "best_against": "Amber/Emerald Princess Aggro",
+      "tactical_role": "Inkowalny cel pod 'Circle of Life' (4/8, 2 Lore, Singer 7): przy wejściu (gdy masz min. 2 inne postacie — np. po Sing Together) dobiera 2 karty i daje potężne ciało stabilizujące stół."
+    },
+    {
+      "card_name": "Aurora - Delightful Musician",
+      "card_id": 1043,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.5413,
+      "expected_bo3_winrate": 0.5605,
+      "play_winrate": 0.4854,
+      "draw_winrate": 0.5972,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.625,
+        "Amber/Sapphire Control": 0.625,
+        "Emerald/Steel Midrange": 0.375,
+        "Amber/Sapphire Detectives": 0.5625,
+        "Amethyst/Steel Midrange": 0.5625,
+        "Emerald/Sapphire Mouse House": 0.5625
+      },
+      "best_against": "Amber/Emerald Princess Aggro",
+      "tactical_role": "Inkowalny 3-drop (2/3): na wejściu zwraca na rękę zaśpiewaną w tej turze pieśń o koszcie <=3 oraz daje +1 Lore na koniec tury, w której zagrałeś pieśń."
+    },
+    {
+      "card_name": "White Rabbit - Late Again",
+      "card_id": 498,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.5249,
+      "expected_bo3_winrate": 0.5373,
+      "play_winrate": 0.5407,
+      "draw_winrate": 0.509,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5625,
+        "Amber/Emerald Princess Aggro": 0.625,
+        "Amber/Sapphire Control": 0.5625,
+        "Emerald/Steel Midrange": 0.3125,
+        "Amber/Sapphire Detectives": 0.4375,
+        "Amethyst/Steel Midrange": 0.5625,
+        "Emerald/Sapphire Mouse House": 0.5625
+      },
+      "best_against": "Amber/Emerald Princess Aggro",
+      "tactical_role": "Kluczowy 2-drop z 'Underdog' (kosztuje 1 ink na Draw w 1. turze!) oraz 'Evasive' — broni przed Evasive zagrożeniami i daje dodatkowe ciało do chóru 'Sing Together 8' dla 'Circle of Life'."
+    },
+    {
+      "card_name": "Ursula - Deceiver",
+      "card_id": 91,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.5235,
+      "expected_bo3_winrate": 0.5357,
+      "play_winrate": 0.5301,
+      "draw_winrate": 0.5168,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5625,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 0.5625,
+        "Emerald/Steel Midrange": 0.3125,
+        "Amber/Sapphire Detectives": 0.6875,
+        "Amethyst/Steel Midrange": 0.5,
+        "Emerald/Sapphire Mouse House": 0.5
+      },
+      "best_against": "Amber/Sapphire Detectives",
+      "tactical_role": "Inkowalny 2-drop (1/3) wyrzucający pieśń z ręki przeciwnika — niszczy plan gry w mirrorze 'Circle of Life' oraz przeciwko 'Amber/Sapphire' i 'Amber/Steel'."
+    },
+    {
+      "card_name": "Lenny - Toy Binoculars",
+      "card_id": 692,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.4898,
+      "expected_bo3_winrate": 0.5084,
+      "play_winrate": 0.3791,
+      "draw_winrate": 0.6005,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.625,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 0.5,
+        "Emerald/Steel Midrange": 0.0625,
+        "Amber/Sapphire Detectives": 0.625,
+        "Amethyst/Steel Midrange": 0.4375,
+        "Emerald/Sapphire Mouse House": 0.5625
+      },
+      "best_against": "Amber/Emerald Circle of Life",
+      "tactical_role": "Tech na Control oraz Mirror: na wejściu odkrywa rękę przeciwnika i odrzuca jego kluczową Akcję/Pieśń (np. 'Circle of Life', 'The Horseman Strikes!'), a sam odtapowuje się po zagraniu akcji."
+    },
+    {
+      "card_name": "Max Goof - Rebellious Teen",
+      "card_id": 76,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.4853,
+      "expected_bo3_winrate": 0.4773,
+      "play_winrate": 0.4918,
+      "draw_winrate": 0.4789,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.3125,
+        "Amber/Emerald Princess Aggro": 0.625,
+        "Amber/Sapphire Control": 0.6875,
+        "Emerald/Steel Midrange": 0.3125,
+        "Amber/Sapphire Detectives": 0.6875,
+        "Amethyst/Steel Midrange": 0.4375,
+        "Emerald/Sapphire Mouse House": 0.4375
+      },
+      "best_against": "Amber/Sapphire Control",
+      "tactical_role": "Dodatkowa baza pod Shift dla 'Max Goof - Chart Topper', która na wejściu pozwala odzyskać z cmentarza kluczową pieśń o koszcie <=3 ('Strike a Good Match', 'Malicious, Mean, and Scary', 'Akood et Emuti')."
+    },
+    {
+      "card_name": "Chernabog - Unnatural Force",
+      "card_id": 486,
+      "cost": 5,
+      "inkable": false,
+      "card_type": "Character",
+      "recommended_copies": 2,
+      "expected_bo1_winrate": 0.4711,
+      "expected_bo3_winrate": 0.4596,
+      "play_winrate": 0.4767,
+      "draw_winrate": 0.4654,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.4375,
+        "Amber/Emerald Princess Aggro": 0.625,
+        "Amber/Sapphire Control": 0.3125,
+        "Emerald/Steel Midrange": 0.3125,
+        "Amber/Sapphire Detectives": 0.625,
+        "Amethyst/Steel Midrange": 0.4375,
+        "Emerald/Sapphire Mouse House": 0.5625
+      },
+      "best_against": "Amber/Emerald Princess Aggro",
+      "tactical_role": "Potężny cel pod 'Circle of Life' oraz odpowiedź (5/4, 2 Lore) wtasowująca największe zagrożenie rywala do jego talii (omija Ward przy wybranych celach / niszczy tempo rywala)."
+    },
+    {
+      "card_name": "To Wither a Flower",
+      "card_id": 918,
+      "cost": 4,
+      "inkable": false,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.4546,
+      "expected_bo3_winrate": 0.4363,
+      "play_winrate": 0.5228,
+      "draw_winrate": 0.3863,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 0.5625,
+        "Emerald/Steel Midrange": 0.25,
+        "Amber/Sapphire Detectives": 0.375,
+        "Amethyst/Steel Midrange": 0.5,
+        "Emerald/Sapphire Mouse House": 0.4375
+      },
+      "best_against": "Amber/Sapphire Control",
+      "tactical_role": "Pieśń (koszt 4, śpiewana przez 'Ursula - Vanessa'): zadaje 2 obrażenia wszystkim zranionym postaciom rywala — w combo z 'Malicious, Mean, and Scary' czyści stoły Aggro/Midrange (3 obrażenia AoE)."
+    },
+    {
+      "card_name": "Max Goof - Chart Topper",
+      "card_id": 78,
+      "cost": 6,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.4358,
+      "expected_bo3_winrate": 0.4037,
+      "play_winrate": 0.3892,
+      "draw_winrate": 0.4823,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.375,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 0.4375,
+        "Emerald/Steel Midrange": 0.375,
+        "Amber/Sapphire Detectives": 0.4375,
+        "Amethyst/Steel Midrange": 0.4375,
+        "Emerald/Sapphire Mouse House": 0.5625
+      },
+      "best_against": "Emerald/Sapphire Mouse House",
+      "tactical_role": "Shift 4 na 'Max Goof - Karaoke Star'; przy każdym queście zagrywa za darmo pieśń o koszcie <=4 z cmentarza (np. 'To Wither a Flower', 'Malicious, Mean, and Scary', 'Akood et Emuti' lub 'Strike a Good Match')."
+    },
+    {
+      "card_name": "Miguel Rivera - Street Musician",
+      "card_id": 1045,
+      "cost": 1,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.3679,
+      "expected_bo3_winrate": 0.3189,
+      "play_winrate": 0.4371,
+      "draw_winrate": 0.2988,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.3125,
+        "Amber/Emerald Princess Aggro": 0.5625,
+        "Amber/Sapphire Control": 0.5625,
+        "Emerald/Steel Midrange": 0.1875,
+        "Amber/Sapphire Detectives": 0.1875,
+        "Amethyst/Steel Midrange": 0.4375,
+        "Emerald/Sapphire Mouse House": 0.3125
+      },
+      "best_against": "Amber/Emerald Princess Aggro",
+      "tactical_role": "Inkowalny 1-drop (1/2), który przy choćby 1 pieśni na cmentarzu zyskuje +1 Lore (questuje za 2!) oraz 'Singer 3' — błyskawicznie przyspiesza 'Sing Together 8' dla 'Circle of Life'."
+    },
+    {
+      "card_name": "Don Karnage - Khan's Courier",
+      "card_id": 1094,
+      "cost": 1,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.3637,
+      "expected_bo3_winrate": 0.31,
+      "play_winrate": 0.3289,
+      "draw_winrate": 0.3985,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.4375,
+        "Amber/Emerald Princess Aggro": 0.375,
+        "Amber/Sapphire Control": 0.625,
+        "Emerald/Steel Midrange": 0.1875,
+        "Amber/Sapphire Detectives": 0.25,
+        "Amethyst/Steel Midrange": 0.25,
+        "Emerald/Sapphire Mouse House": 0.3125
+      },
+      "best_against": "Amber/Sapphire Control",
+      "tactical_role": "Agresywny 1-drop 2/2/1 (inkowalny), który wymienia się w 1-2 turze z postaciami Princess Aggro i stanowi bazę pod Shift 4 dla 'Don Karnage - Debonair Pirate'."
+    }
+  ],
+  "matchup_breakdown": {
+    "Amber/Emerald Circle of Life": {
+      "meta_share": 0.2483,
+      "bo1_winrate": 0.5,
+      "bo3_winrate": 0.5,
+      "play_winrate": 0.25,
+      "draw_winrate": 0.75
+    },
+    "Amber/Emerald Princess Aggro": {
+      "meta_share": 0.1629,
+      "bo1_winrate": 0.625,
+      "bo3_winrate": 0.6875,
+      "play_winrate": 0.75,
+      "draw_winrate": 0.5
+    },
+    "Amber/Sapphire Control": {
+      "meta_share": 0.1306,
+      "bo1_winrate": 0.625,
+      "bo3_winrate": 0.6875,
+      "play_winrate": 0.75,
+      "draw_winrate": 0.5
+    },
+    "Emerald/Steel Midrange": {
+      "meta_share": 0.1279,
+      "bo1_winrate": 0.375,
+      "bo3_winrate": 0.3164,
+      "play_winrate": 0.375,
+      "draw_winrate": 0.375
+    },
+    "Amber/Sapphire Detectives": {
+      "meta_share": 0.1267,
+      "bo1_winrate": 0.75,
+      "bo3_winrate": 0.8438,
+      "play_winrate": 0.75,
+      "draw_winrate": 0.75
+    },
+    "Amethyst/Steel Midrange": {
+      "meta_share": 0.1109,
+      "bo1_winrate": 0.625,
+      "bo3_winrate": 0.6836,
+      "play_winrate": 0.625,
+      "draw_winrate": 0.625
+    },
+    "Emerald/Sapphire Mouse House": {
+      "meta_share": 0.0927,
+      "bo1_winrate": 0.6875,
+      "bo3_winrate": 0.7812,
+      "play_winrate": 0.5,
+      "draw_winrate": 0.875
+    }
+  },
+  "dreamborn_decklist": "4 Angel - Siren Singer\n4 Strike a Good Match\n3 Ursula - Deceiver\n4 Ursula - Vanessa\n2 White Rabbit - Late Again\n4 Akood et Emuti\n3 Lenny - Toy Binoculars\n4 Malicious, Mean, and Scary\n4 Max Goof - Karaoke Star\n4 Meilin Lee - Losing Control\n4 Tod - Clever Fox\n3 Chernabog - Unnatural Force\n3 Max Goof - Chart Topper\n4 Milo Thatch - Getting His Hands Dirty\n2 Stitch - Carefree Surfer\n4 Circle of Life\n4 Prince Phillip - Vanquisher of Foes"
+}

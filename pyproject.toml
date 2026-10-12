@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "lorcana-alpha"
+version = "0.1.0"
+description = "Disney Lorcana AI Playing Agent (IS-MCTS + Transformer RL) & Evolutionary Deckbuilder for PLGrid Athena"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "torch>=2.1.0",
+    "scipy>=1.11.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "streamlit>=1.32.0",
+    "plotly>=5.19.0",
+    "pandas>=2.1.0",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "lorcana_rs"
+python-source = "."

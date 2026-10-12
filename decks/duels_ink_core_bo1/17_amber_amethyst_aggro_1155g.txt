@@ -1,0 +1,18 @@
+# Amber/Amethyst Aggro (Amber/Amethyst)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1236e-bd17-740b-8edc-2121cc1dd62b)
+# Games Played: 1155 | Win Rate: 53.68% | Meta Share: 1.96%
+4 Aurora - Holding Court
+4 Meeko - Lucky Raccoon
+4 Meeko - Skittish Scrounger
+4 Mickey Mouse - Best in Town
+4 Rapunzel - Outgoing Artist
+4 Christopher Robin - Joining the Fun
+4 David - Protective Snowboarder
+4 Grandmother Willow - Ancient Advisor
+4 Mike Wazowski - Heroic Climber
+4 Miriam Mendelsohn - Ticket Holder
+4 Pocahontas - Following the Wind
+4 Pocahontas - Guiding the Tribe
+4 Dale - Ready for His Shot
+4 Pocahontas & Meeko - Adventurous Friends
+4 Pocahontas - Peacekeeper
