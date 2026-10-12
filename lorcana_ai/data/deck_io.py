@@ -174,7 +174,7 @@ class Deck:
             if not m:
                 continue
             qty = int(m.group(1))
-            card_name = m.group(2)
+            card_name = re.sub(r"\s*[\(\[][0-9A-Za-z-]+[\)\]]\s*$", "", m.group(2)).strip()
             card = db.get_by_name(card_name)
             if card is not None:
                 counts[card.card_id] += qty

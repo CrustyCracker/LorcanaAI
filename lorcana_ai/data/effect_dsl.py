@@ -80,6 +80,9 @@ class EffectOpType(str, Enum):
     HEAL_DRAW = "HEAL_DRAW"
     READY_CHAR = "READY_CHAR"
     BOOST_UNDER = "BOOST_UNDER"
+    PLAY_COST1_CHAR_FREE = "PLAY_COST1_CHAR_FREE"
+    FOG_CHALLENGES = "FOG_CHALLENGES"
+    REVEAL_TOP_CHAR_BOTH = "REVEAL_TOP_CHAR_BOTH"
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ class CompiledAbilities:
     resist_bonus: int = 0
     has_underdog: bool = False
     has_five_songs_lore_bonus: bool = False
+    deals_willpower_damage_in_challenges: bool = False
     clauses: list[EffectClause] = field(default_factory=list)
 
     def to_rust_bitflags(self) -> tuple[int, int]:
@@ -189,31 +193,46 @@ class EffectDSLCompiler:
         lower = text.lower()
         kw_set = {k.lower() for k in (keyword_list or [])}
 
-        # 1. Parse Keywords (CR Section 8)
-        if "rush" in kw_set or re.search(r"\bRush\b", text, re.IGNORECASE):
+        # 1. Parse Native Keywords (CR Section 8) — avoid false positives from "lose Rush" / "give chosen character ..."
+        def _has_native_kw(kw_name: str) -> bool:
+            if kw_name.lower() in kw_set:
+                return True
+            if keyword_list is None:
+                return bool(re.search(rf"\b{kw_name}\b", text, re.IGNORECASE))
+            return bool(
+                re.search(
+                    rf"(?<!gains\s)(?<!gain\s)(?<!lose\s)(?<!character\s)\b{kw_name}\s*\(",
+                    text,
+                    re.IGNORECASE,
+                )
+            )
+
+        if _has_native_kw("Rush"):
             abilities.keywords |= KeywordFlag.RUSH
-        if "ward" in kw_set or re.search(r"\bWard\b", text, re.IGNORECASE):
+        if _has_native_kw("Ward"):
             abilities.keywords |= KeywordFlag.WARD
-        if "evasive" in kw_set or re.search(r"\bEvasive\b", text, re.IGNORECASE):
+        if _has_native_kw("Evasive"):
             abilities.keywords |= KeywordFlag.EVASIVE
-        if "bodyguard" in kw_set or re.search(r"\bBodyguard\b", text, re.IGNORECASE):
+        if _has_native_kw("Bodyguard"):
             abilities.keywords |= KeywordFlag.BODYGUARD
-        if "support" in kw_set or re.search(r"\bSupport\b", text, re.IGNORECASE):
+        if _has_native_kw("Support") or "this character gains support" in lower:
             abilities.keywords |= KeywordFlag.SUPPORT
-        if "vanish" in kw_set or re.search(r"\bVanish\b", text, re.IGNORECASE):
+        if _has_native_kw("Vanish"):
             abilities.keywords |= KeywordFlag.VANISH
-        if "reckless" in kw_set or re.search(r"\bReckless\b", text, re.IGNORECASE):
+        if _has_native_kw("Reckless"):
             abilities.keywords |= KeywordFlag.RECKLESS
-        if "alert" in kw_set or re.search(r"\bAlert\b", text, re.IGNORECASE):
+        if _has_native_kw("Alert"):
             abilities.keywords |= KeywordFlag.ALERT
-        if "adventurous" in kw_set or re.search(r"\bAdventurous\b", text, re.IGNORECASE):
+        if _has_native_kw("Adventurous"):
             abilities.keywords |= KeywordFlag.ADVENTUROUS
 
-        # Underdog & 5+ Songs in discard Lore bonus (Max Goof - Karaoke Star)
+        # Underdog, 5+ Songs Lore bonus, and Dale's Willpower damage in challenges
         if "if this is your first turn and you're not the first player, you pay 1" in lower:
             abilities.has_underdog = True
         if "5 or more song cards in your discard, this character gets +3" in lower:
             abilities.has_five_songs_lore_bonus = True
+        if "during challenges, your characters deal damage with their" in lower:
+            abilities.deals_willpower_damage_in_challenges = True
 
         # 2. All 6 Official Shift Variants (CR Rule 8.10.8)
         m_tshift = cls._RE_TEMP_CLASS_SHIFT.search(text)
@@ -265,10 +284,15 @@ class EffectDSLCompiler:
 
         m_chal = cls._RE_CHALLENGER.search(text)
         if m_chal:
-            abilities.challenger_bonus = int(m_chal.group(1))
+            if "give chosen character challenger" in lower:
+                abilities.clauses.append(
+                    EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.BUFF_ALLY_STR, amount=int(m_chal.group(1)))
+                )
+            else:
+                abilities.challenger_bonus = int(m_chal.group(1))
 
         m_res = cls._RE_RESIST.search(text)
-        if m_res:
+        if m_res and "give chosen character" not in lower:
             abilities.resist_bonus = int(m_res.group(1))
 
         if explicit_clauses:
@@ -285,7 +309,7 @@ class EffectDSLCompiler:
         )
         if "whenever this character quests" in lower and "when you play" not in lower:
             default_trig = TriggerType.ON_QUEST
-        elif "when this character is banished" in lower or "leaves play" in lower:
+        elif ("when this character is banished" in lower or "leaves play" in lower or "whenever this character is challenged" in lower) and "when you play" not in lower:
             default_trig = TriggerType.ON_LEAVE_PLAY
         elif "at the end of your turn" in lower and "when you play" not in lower:
             default_trig = TriggerType.END_OF_TURN
@@ -295,7 +319,7 @@ class EffectDSLCompiler:
         m_thresh = cls._RE_STR_THRESH.search(text)
         str_thresh = int(m_thresh.group(1)) if m_thresh else 0
 
-        # A. Reanimation & Song Replay (Circle of Life, Max Goof - Chart Topper)
+        # A. Reanimation, Song Replay & Free Cost-1 Character Deployment (Circle of Life, Max Goof, Pocahontas)
         if "play a character from your discard for free" in lower and "that player" not in lower:
             abilities.clauses.append(
                 EffectClause(trigger=default_trig, op=EffectOpType.REANIMATE_CHAR, amount=1)
@@ -304,6 +328,22 @@ class EffectDSLCompiler:
             abilities.clauses.append(
                 EffectClause(trigger=TriggerType.ON_QUEST, op=EffectOpType.REPLAY_SONG_FROM_DISCARD, amount=1, threshold=4)
             )
+        if "play a character with cost 1 for free" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=default_trig, op=EffectOpType.PLAY_COST1_CHAR_FREE, amount=1)
+            )
+        if "characters can't challenge until the start of your next turn" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.FOG_CHALLENGES, amount=1)
+            )
+        if "each player reveals the top card of their deck" in lower and "character card" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.REVEAL_TOP_CHAR_BOTH, amount=1)
+            )
+            if "whenever he quests" in lower or "whenever this character quests" in lower:
+                abilities.clauses.append(
+                    EffectClause(trigger=TriggerType.ON_QUEST, op=EffectOpType.REVEAL_TOP_CHAR_BOTH, amount=1)
+                )
 
         # B. Board Wipes & Targeted Removal (Prince Phillip - Vanquisher of Foes, Under the Sea, etc.)
         if "banish all opposing damaged characters" in lower:
@@ -323,6 +363,7 @@ class EffectDSLCompiler:
             "banish chosen character" in lower
             or "banish chosen opposing character" in lower
             or "shuffle chosen opposing character into their player's deck" in lower
+            or ("put chosen opposing character" in lower and "deck" in lower)
         ):
             op_t = EffectOpType.BANISH_LOW_STR_CHAR if str_thresh > 0 else EffectOpType.BANISH_CHAR
             abilities.clauses.append(
@@ -378,18 +419,37 @@ class EffectDSLCompiler:
                 EffectClause(trigger=default_trig, op=EffectOpType.DEAL_DAMAGE, amount=4)
             )
 
-        # D. Next-Character Ink Discount (Akood et Emuti, Aurora - Holding Court, etc.)
+        # D. Next-Character Ink Discount (Akood et Emuti, Aurora - Holding Court, Grandmother Willow, Pluto)
         m_disc_char = cls._RE_DISCOUNT_CHAR.search(text)
         if m_disc_char:
-            abilities.clauses.append(
-                EffectClause(
-                    trigger=default_trig,
-                    op=EffectOpType.DISCOUNT_NEXT_CHAR,
-                    amount=int(m_disc_char.group(1)),
+            disc_amt = int(m_disc_char.group(1))
+            if "⟳" in text:
+                abilities.clauses.append(
+                    EffectClause(
+                        trigger=TriggerType.ACTIVATED,
+                        op=EffectOpType.DISCOUNT_NEXT_CHAR,
+                        amount=disc_amt,
+                        requires_exert=True,
+                    )
                 )
-            )
+            else:
+                abilities.clauses.append(
+                    EffectClause(
+                        trigger=default_trig,
+                        op=EffectOpType.DISCOUNT_NEXT_CHAR,
+                        amount=disc_amt,
+                    )
+                )
+                if "once during your turn, you pay 1" in lower:
+                    abilities.clauses.append(
+                        EffectClause(
+                            trigger=TriggerType.START_OF_TURN,
+                            op=EffectOpType.DISCOUNT_NEXT_CHAR,
+                            amount=disc_amt,
+                        )
+                    )
 
-        # E. Self-Looting vs Pure Draw vs Ink-Type Draw vs Song Recursion
+        # E. Self-Looting vs Pure Draw vs Ink-Type Draw vs Song/Character Recursion
         is_self_loot = (
             ("then choose and discard" in lower)
             or ("choose and discard a song card. if you do, draw" in lower)
@@ -419,9 +479,15 @@ class EffectDSLCompiler:
         elif (
             ("look at the top" in lower and "put" in lower and "hand" in lower)
             or ("return a song card" in lower and "from your discard to your hand" in lower)
+            or ("return a character card" in lower and "from your discard to your hand" in lower)
+            or ("draw that number of cards plus 1" in lower)
         ):
             abilities.clauses.append(
                 EffectClause(trigger=default_trig, op=EffectOpType.DRAW, amount=1)
+            )
+        if "put the top 3 cards of your deck into your discard" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.BUFF_ALLY_STR, amount=3)
             )
 
         # F. Ink Drop Counters (Rule 1.13.1.2) vs Standard Inkwell Ramp
@@ -438,7 +504,7 @@ class EffectDSLCompiler:
                 EffectClause(trigger=default_trig, op=EffectOpType.RAMP_INK, amount=1)
             )
 
-        # G. Lore Gain / Loss
+        # G. Lore Gain / Loss (including Lionheart +1 Lore to 2 chars / Pocahontas Finding the Way +1 Lore to 1 char)
         m_lore = cls._RE_GAIN_LORE.search(text)
         if m_lore:
             abilities.clauses.append(
@@ -448,6 +514,14 @@ class EffectDSLCompiler:
                     amount=int(m_lore.group(1)),
                     requires_card_under=needs_card_under,
                 )
+            )
+        elif "up to 2 chosen characters get +1 ◊ this turn" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.GAIN_LORE, amount=2)
+            )
+        elif "chosen character gets +1 ◊ this turn" in lower and "pay" not in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.GAIN_LORE, amount=1)
             )
 
         m_lose_lore = cls._RE_LOSE_LORE.search(text)
@@ -461,24 +535,26 @@ class EffectDSLCompiler:
                 )
             )
 
-        # H. Bounce (Milo Thatch, Mother Knows Best, etc.)
-        if "return chosen character" in lower or "return chosen opposing character" in lower:
+        # H. Bounce (Nani - Stage Manager self-bounce vs Milo Thatch, Finnick, Rapunzel, Mother Knows Best opp-bounce)
+        if "return another chosen character of yours" in lower or "return chosen character of yours" in lower:
+            abilities.clauses.append(
+                EffectClause(trigger=default_trig, op=EffectOpType.BOUNCE_OWN_CHAR, amount=1)
+            )
+        elif "return chosen character" in lower or "return chosen opposing character" in lower:
+            pay_2 = 2 if "you may pay 2" in lower else 0
             abilities.clauses.append(
                 EffectClause(
                     trigger=default_trig,
                     op=EffectOpType.BOUNCE_OPP_CHAR,
                     amount=1,
                     threshold=str_thresh,
+                    cost_ink=pay_2,
                 )
             )
             if "if 2 or more cards were put into your discard this turn, draw a card" in lower:
                 abilities.clauses.append(
                     EffectClause(trigger=TriggerType.END_OF_TURN, op=EffectOpType.DRAW, amount=1)
                 )
-        elif "return another chosen character of yours" in lower:
-            abilities.clauses.append(
-                EffectClause(trigger=default_trig, op=EffectOpType.BOUNCE_OWN_CHAR, amount=1)
-            )
 
         # I. Opponent Discard (only when targeting an opponent!)
         if (

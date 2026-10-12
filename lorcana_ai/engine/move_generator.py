@@ -125,14 +125,17 @@ class MoveGenerator:
             # Standard Ink Play (CR Rule 4.4 + Underdog / Akood et Emuti discounts)
             eff_cost = p.effective_play_cost(card, is_second_player_first_turn=is_p2_first_turn)
             if eff_cost <= payable_ink:
-                if card.card_type == "Character" and bool(card.abilities.keywords & KeywordFlag.BODYGUARD):
-                    # CR Rule 8.3.2: Bodyguard character may enter play exerted instead of ready
+                if card.card_type == "Character" and (
+                    bool(card.abilities.keywords & KeywordFlag.BODYGUARD)
+                    or "this character may enter play exerted" in card.full_text.lower()
+                ):
+                    # CR Rule 8.3.2 / Mickey Mouse - Expedition Leader: may enter play exerted instead of ready
                     actions.append(
                         GameAction(
                             action_type=ActionType.PLAY_CARD,
                             hand_index=idx,
                             enter_exerted=True,
-                            description=f"Play {card.full_name} exerted (Bodyguard, {eff_cost} ink)",
+                            description=f"Play {card.full_name} exerted ({eff_cost} ink)",
                         )
                     )
                 actions.append(
@@ -223,46 +226,50 @@ class MoveGenerator:
         opp_locations = opp.locations_in_play
 
         has_forced_reckless_challenge = False
-        for my_char in p.characters_in_play:
-            if not my_char.can_challenge():
-                continue
-            my_has_evasive = my_char.has_keyword(KeywordFlag.EVASIVE) or my_char.has_keyword(
-                KeywordFlag.ALERT
-            )
-            valid_targets: list[BoardEntity] = []
-            # CR Rule 8.3.3: Bodyguard applies when choosing an opposing character to challenge
-            candidate_pool = bodyguards if bodyguards else exerted_opp_chars
-            for target in candidate_pool:
-                if target.has_keyword(KeywordFlag.EVASIVE) and not my_has_evasive:
+        if not p.cant_challenge_this_turn:
+            for my_char in p.characters_in_play:
+                if not my_char.can_challenge():
                     continue
-                valid_targets.append(target)
-            if not valid_targets and bodyguards:
-                for target in exerted_opp_chars:
+                my_has_evasive = my_char.has_keyword(KeywordFlag.EVASIVE) or my_char.has_keyword(
+                    KeywordFlag.ALERT
+                )
+                valid_targets: list[BoardEntity] = []
+                # CR Rule 8.3.3: Bodyguard applies when choosing an opposing character to challenge
+                candidate_pool = bodyguards if bodyguards else exerted_opp_chars
+                for target in candidate_pool:
                     if target.has_keyword(KeywordFlag.EVASIVE) and not my_has_evasive:
                         continue
                     valid_targets.append(target)
+                if not valid_targets and bodyguards:
+                    for target in exerted_opp_chars:
+                        if target.has_keyword(KeywordFlag.EVASIVE) and not my_has_evasive:
+                            continue
+                        valid_targets.append(target)
 
-            # CR Rule 4.6.8: Opposing locations are always valid challenge targets
-            valid_targets.extend(opp_locations)
+                # CR Rule 4.6.8: Opposing locations are always valid challenge targets
+                valid_targets.extend(opp_locations)
 
-            # CR Rule 8.7.3: Reckless prevents declaring end of turn if ready and can challenge an opposing character or location
-            if valid_targets and my_char.has_keyword(KeywordFlag.RECKLESS):
-                has_forced_reckless_challenge = True
+                # CR Rule 8.7.3: Reckless prevents declaring end of turn if ready and can challenge an opposing character or location
+                if valid_targets and my_char.has_keyword(KeywordFlag.RECKLESS):
+                    has_forced_reckless_challenge = True
 
-            for target in valid_targets:
-                actions.append(
-                    GameAction(
-                        action_type=ActionType.CHALLENGE,
-                        source_instance_id=my_char.instance_id,
-                        target_instance_id=target.instance_id,
-                        description=f"{my_char.card.full_name} challenges {target.card.full_name}",
+                for target in valid_targets:
+                    actions.append(
+                        GameAction(
+                            action_type=ActionType.CHALLENGE,
+                            source_instance_id=my_char.instance_id,
+                            target_instance_id=target.instance_id,
+                            description=f"{my_char.card.full_name} challenges {target.card.full_name}",
+                        )
                     )
-                )
 
         # 5. Quest with ready dry characters (CR Rule 4.5 & Adventurous 8.16.3)
         has_forced_adventurous_quest = False
+        has_4wp_char = any(e.effective_willpower >= 4 for e in p.characters_in_play)
         for my_char in p.characters_in_play:
             if my_char.can_quest():
+                if "unless you have a character with 4" in my_char.card.full_text.lower() and not has_4wp_char:
+                    continue
                 if my_char.has_keyword(KeywordFlag.ADVENTUROUS):
                     # CR Rule 8.16.3: You can't declare the end of your turn if this character is ready and can quest
                     has_forced_adventurous_quest = True
@@ -309,7 +316,7 @@ class MoveGenerator:
 
             for cl in ent.card.abilities.clauses:
                 if cl.trigger == TriggerType.ACTIVATED:
-                    if cl.requires_exert and ent.exerted:
+                    if cl.requires_exert and (ent.exerted or (ent.card.card_type == "Character" and ent.drying)):
                         continue
                     if cl.cost_ink > payable_ink:
                         continue

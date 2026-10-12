@@ -204,6 +204,20 @@ class LorcanaSimulator:
                             if ally.instance_id != ent.instance_id:
                                 ally.temp_strength_mod += ent.effective_strength
                                 break
+                    # Mickey Mouse - Expedition Leader: "While this character is exerted, whenever one of your other characters quests, chosen opposing character gets -2 ¤ until the start of your next turn."
+                    for ally in p.characters_in_play:
+                        if (
+                            ally.instance_id != ent.instance_id
+                            and ally.exerted
+                            and "whenever one of your other characters quests" in ally.card.full_text.lower()
+                        ):
+                            opp_targets = [
+                                e for e in opp.characters_in_play
+                                if e.effective_strength > 0 and not e.has_keyword(KeywordFlag.WARD)
+                            ]
+                            if opp_targets:
+                                best_opp = max(opp_targets, key=lambda e: (e.effective_strength, e.card.lore))
+                                best_opp.temp_strength_mod -= 2
                     cls._resolve_clauses(state, p_id, ent.card, TriggerType.ON_QUEST, source_id=ent.instance_id)
                     break
             cls._check_victory(state)
@@ -218,8 +232,13 @@ class LorcanaSimulator:
             )
             if attacker is not None and defender is not None:
                 attacker.exerted = True
+                p.challenged_this_turn = True
+                p_uses_wp = any(e.card.abilities.deals_willpower_damage_in_challenges for e in p.characters_in_play)
+                opp_uses_wp = any(e.card.abilities.deals_willpower_damage_in_challenges for e in opp.characters_in_play)
+
+                base_atk = attacker.effective_willpower if p_uses_wp else attacker.effective_strength
                 atk_power = (
-                    attacker.effective_strength
+                    base_atk
                     + attacker.card.abilities.challenger_bonus
                     + attacker.temp_challenger_mod
                 )
@@ -228,9 +247,14 @@ class LorcanaSimulator:
 
                 # CR Rule 4.6.8.2: Locations do not have Strength and do not deal damage when challenged
                 if defender.card.card_type == "Character":
-                    def_power = defender.effective_strength
+                    base_def = defender.effective_willpower if opp_uses_wp else defender.effective_strength
+                    def_power = base_def
                     dmg_to_atk = max(0, def_power - attacker.card.abilities.resist_bonus)
                     attacker.damage += dmg_to_atk
+                    # The Prince - Searching for His Love: "During your turn, whenever this character banishes another character in a challenge, draw a card."
+                    if defender.is_banished and "banishes another character in a challenge, draw a card" in attacker.card.full_text.lower():
+                        if p.deck:
+                            p.hand.append(p.deck.pop())
 
                 cls._cleanup_banished(state)
                 cls._check_victory(state)
@@ -261,7 +285,7 @@ class LorcanaSimulator:
                 else:
                     for cl in ent.card.abilities.clauses:
                         if cl.trigger == TriggerType.ACTIVATED:
-                            if cl.requires_exert and ent.exerted:
+                            if cl.requires_exert and (ent.exerted or (ent.card.card_type == "Character" and ent.drying)):
                                 continue
                             if cl.cost_ink > p.total_payable_ink:
                                 continue
@@ -298,6 +322,13 @@ class LorcanaSimulator:
         # 1. Resolve END_OF_TURN triggers
         for ent in list(p.board):
             cls._resolve_clauses(state, p_id, ent.card, TriggerType.END_OF_TURN, source_id=ent.instance_id)
+
+        # Clear cant_challenge_this_turn and same-turn buffs for the player whose turn just ended
+        p.cant_challenge_this_turn = False
+        for ent in p.board:
+            if ent.temp_strength_mod > 0:
+                ent.temp_strength_mod = 0
+            ent.temp_challenger_mod = 0
 
         # 2. Resolve Temporary Shift (CR Rule 8.10.8.5):
         # "At the end of the turn you play a character with Temporary Shift, remove all damage from it and return it to your hand."
@@ -337,17 +368,22 @@ class LorcanaSimulator:
     def _begin_turn(cls, state: GameState, draw_card: bool) -> None:
         p_id = state.active_player
         p = state.players[p_id]
+        opp = state.players[1 - p_id]
 
         # Ready step (CR Rule 2.3.1)
         p.inkwell_available = p.inkwell_total
         p.next_char_discount = 0
         p.inked_this_turn = False
+        p.challenged_this_turn = False
         for ent in p.board:
             ent.exerted = False
             ent.drying = False
             ent.boosted_this_turn = False
-            ent.temp_strength_mod = 0
             ent.temp_challenger_mod = 0
+        # Clear "until the start of your next turn" strength debuffs placed on opp's characters
+        for ent in opp.board:
+            if ent.temp_strength_mod < 0:
+                ent.temp_strength_mod = 0
 
         # Set step (CR Rule 2.3.2): passive location lore & start-of-turn triggers
         for loc in p.locations_in_play:
@@ -378,12 +414,23 @@ class LorcanaSimulator:
     ) -> None:
         p = state.players[controller_id]
         source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+        card_lower = card.full_text.lower()
+        if trigger == TriggerType.END_OF_TURN:
+            if "3 or more exerted characters" in card_lower and sum(1 for e in p.characters_in_play if e.exerted) < 3:
+                return
+            if "if this character is exerted" in card_lower and (source_ent is None or not source_ent.exerted):
+                return
         for cl in card.abilities.clauses:
             if cl.trigger == trigger:
                 if cl.requires_card_under and (source_ent is None or source_ent.cards_under_count <= 0):
                     continue
                 cls._execute_single_clause(
-                    state, controller_id, cl, source_id=source_id, is_action_source=is_action_source
+                    state,
+                    controller_id,
+                    cl,
+                    source_id=source_id,
+                    is_action_source=is_action_source,
+                    card_text=card_lower,
                 )
 
     @classmethod
@@ -403,16 +450,57 @@ class LorcanaSimulator:
         cl: EffectClause,
         source_id: int,
         is_action_source: bool = False,
+        card_text: str = "",
     ) -> None:
         p = state.players[controller_id]
         opp_id = 1 - controller_id
         opp = state.players[opp_id]
         op = cl.op
+        source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+        if not card_text and source_ent is not None:
+            card_text = source_ent.card.full_text.lower()
 
         if op == EffectOpType.DRAW:
-            for _ in range(cl.amount):
-                if p.deck:
-                    p.hand.append(p.deck.pop())
+            if (
+                "look at the top 4 cards of your deck" in card_text
+                and "cost 2 or less" in card_text
+            ):
+                # Nani - Stage Manager: look at top 4, reveal a character with cost <= 2 and put into hand, rest on bottom
+                looked: list[CardTemplate] = [p.deck.pop() for _ in range(min(4, len(p.deck)))]
+                valid_c2 = [
+                    (i, c) for i, c in enumerate(looked) if c.card_type == "Character" and c.cost <= 2
+                ]
+                if valid_c2:
+                    best_i, chosen_c = max(
+                        valid_c2,
+                        key=lambda item: (
+                            len(item[1].abilities.clauses),
+                            item[1].lore * 2 + item[1].willpower,
+                        ),
+                    )
+                    looked.pop(best_i)
+                    p.hand.append(chosen_c)
+                    p.revealed_hand_ids.append(chosen_c.card_id)
+                for rem_c in looked:
+                    p.deck.insert(0, rem_c)
+            elif "return a character card" in card_text and "from your discard to your hand" in card_text:
+                char_grave = [(i, c) for i, c in enumerate(p.discard) if c.card_type == "Character"]
+                if char_grave:
+                    best_i, chosen_c = max(char_grave, key=lambda item: (item[1].cost + item[1].lore * 2, item[1].willpower))
+                    p.discard.pop(best_i)
+                    p.hand.append(chosen_c)
+                    p.revealed_hand_ids.append(chosen_c.card_id)
+            elif "return a song card" in card_text and "from your discard to your hand" in card_text:
+                song_grave = [(i, c) for i, c in enumerate(p.discard) if c.is_song]
+                if song_grave:
+                    best_i, chosen_s = max(song_grave, key=lambda item: item[1].cost)
+                    p.discard.pop(best_i)
+                    p.hand.append(chosen_s)
+                    p.revealed_hand_ids.append(chosen_s.card_id)
+            else:
+                for _ in range(cl.amount):
+                    if p.deck:
+                        p.hand.append(p.deck.pop())
 
         elif op == EffectOpType.LOOT_SELF:
             # Draw cl.amount cards, then smartly discard 1 card (sets up Circle of Life reanimation or Song grave!)
@@ -502,6 +590,52 @@ class LorcanaSimulator:
                     state, controller_id, chosen_song, TriggerType.ON_PLAY, source_id=-1, is_action_source=True
                 )
                 p.deck.insert(0, chosen_song)
+
+        elif op == EffectOpType.PLAY_COST1_CHAR_FREE:
+            # Pocahontas - Guiding the Tribe: "When you play this character, you may play a character with cost 1 for free."
+            cost1_candidates = [
+                (idx, c) for idx, c in enumerate(p.hand) if c.card_type == "Character" and c.cost <= 1
+            ]
+            if cost1_candidates:
+                best_idx, chosen_c1 = max(
+                    cost1_candidates,
+                    key=lambda item: (
+                        len(item[1].abilities.clauses),
+                        item[1].lore * 2 + item[1].willpower + item[1].strength,
+                    ),
+                )
+                p.hand.pop(best_idx)
+                if chosen_c1.card_id in p.revealed_hand_ids:
+                    p.revealed_hand_ids.remove(chosen_c1.card_id)
+                new_ent = BoardEntity(
+                    instance_id=state.next_instance_id,
+                    card=chosen_c1,
+                    exerted=False,
+                    drying=True,
+                )
+                state.next_instance_id += 1
+                p.board.append(new_ent)
+                cls._resolve_clauses(
+                    state, controller_id, chosen_c1, TriggerType.ON_PLAY, source_id=new_ent.instance_id
+                )
+
+        elif op == EffectOpType.FOG_CHALLENGES:
+            # Pocahontas - Peacekeeper: "When you play this character, if you used Shift to play her and none of your characters challenged this turn, characters can't challenge until the start of your next turn."
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if source_ent is not None and source_ent.cards_under_count > 0 and not p.challenged_this_turn:
+                p.cant_challenge_this_turn = True
+                opp.cant_challenge_this_turn = True
+
+        elif op == EffectOpType.REVEAL_TOP_CHAR_BOTH:
+            # Mike Wazowski - Heroic Climber: "When you play this character and whenever he quests, each player reveals the top card of their deck. If it's a character card, they put it into their hand. Otherwise, they put it on the bottom of their deck."
+            for pl in (p, opp):
+                if pl.deck:
+                    top_c = pl.deck.pop()
+                    if top_c.card_type == "Character":
+                        pl.hand.append(top_c)
+                        pl.revealed_hand_ids.append(top_c.card_id)
+                    else:
+                        pl.deck.insert(0, top_c)
 
         elif op == EffectOpType.DISCOUNT_NEXT_CHAR:
             p.next_char_discount += cl.amount
@@ -615,12 +749,15 @@ class LorcanaSimulator:
             cls._cleanup_banished(state)
 
         elif op == EffectOpType.BOUNCE_OWN_CHAR:
+            self_ent = next((e for e in p.characters_in_play if e.instance_id == source_id), None)
+            is_optional = self_ent is not None and "you may" in self_ent.card.full_text.lower()
             others = [e for e in p.characters_in_play if e.instance_id != source_id]
             if others:
                 best_own = max(
                     others,
                     key=lambda e: (
                         any(c.trigger == TriggerType.ON_LEAVE_PLAY for c in e.card.abilities.clauses),
+                        any(c.trigger == TriggerType.ON_PLAY for c in e.card.abilities.clauses),
                         e.damage > 0,
                         e.exerted,
                         -e.card.cost,
@@ -632,19 +769,21 @@ class LorcanaSimulator:
                 )
                 p.hand.append(best_own.card)
                 p.revealed_hand_ids.append(best_own.card.card_id)
-            else:
-                self_ent = next((e for e in p.characters_in_play if e.instance_id == source_id), None)
-                if self_ent is not None:
-                    p.board.remove(self_ent)
-                    p.discard.append(self_ent.card)
+            elif not is_optional and self_ent is not None:
+                p.board.remove(self_ent)
+                p.discard.append(self_ent.card)
 
         elif op == EffectOpType.BOUNCE_OPP_CHAR:
+            if cl.cost_ink > 0 and p.total_payable_ink < cl.cost_ink:
+                return
             thresh = cl.threshold if cl.threshold > 0 else 99
             targets = [
                 e for e in opp.characters_in_play
                 if e.effective_strength <= thresh and not e.has_keyword(KeywordFlag.WARD)
             ]
             if targets:
+                if cl.cost_ink > 0:
+                    p.pay_ink(cl.cost_ink)
                 best_t = max(targets, key=lambda e: (e.card.cost + e.card.lore * 2))
                 if is_action_source and best_t.has_keyword(KeywordFlag.VANISH):
                     # CR Rule 8.14.1: Chosen by opponent's action -> banished
@@ -659,24 +798,43 @@ class LorcanaSimulator:
                     opp.revealed_hand_ids.append(best_t.card.card_id)
 
         elif op == EffectOpType.DISCARD_OPP:
-            for _ in range(cl.amount):
-                if opp.hand:
-                    worst_idx = min(
-                        range(len(opp.hand)),
-                        key=lambda i: (opp.hand[i].inkable, opp.hand[i].lore, opp.hand[i].cost),
+            if "reveals their hand" in card_text:
+                opp.revealed_hand_ids = [c.card_id for c in opp.hand]
+            if "discards a song card" in card_text:
+                song_indices = [i for i, c in enumerate(opp.hand) if c.is_song]
+                if song_indices:
+                    best_song_idx = max(
+                        song_indices,
+                        key=lambda i: (len(opp.hand[i].abilities.clauses), opp.hand[i].cost),
                     )
-                    discarded = opp.hand.pop(worst_idx)
+                    discarded = opp.hand.pop(best_song_idx)
                     opp.discard.append(discarded)
                     if discarded.card_id in opp.revealed_hand_ids:
                         opp.revealed_hand_ids.remove(discarded.card_id)
+            else:
+                for _ in range(cl.amount):
+                    if opp.hand:
+                        worst_idx = min(
+                            range(len(opp.hand)),
+                            key=lambda i: (opp.hand[i].inkable, opp.hand[i].lore, opp.hand[i].cost),
+                        )
+                        discarded = opp.hand.pop(worst_idx)
+                        opp.discard.append(discarded)
+                        if discarded.card_id in opp.revealed_hand_ids:
+                            opp.revealed_hand_ids.remove(discarded.card_id)
 
         elif op == EffectOpType.BUFF_ALLY_STR:
+            buff_val = cl.amount
+            if "put the top 3 cards of your deck into your discard" in card_text:
+                for _ in range(min(3, len(p.deck))):
+                    p.discard.append(p.deck.pop())
+                buff_val = sum(1 for c in p.discard if c.is_song)
             allies = [e for e in p.characters_in_play if e.instance_id != source_id and e.can_challenge()]
             if not allies:
                 allies = [e for e in p.characters_in_play if e.instance_id != source_id]
-            if allies:
+            if allies and buff_val > 0:
                 best_ally = max(allies, key=lambda e: e.effective_strength)
-                best_ally.temp_challenger_mod += cl.amount
+                best_ally.temp_challenger_mod += buff_val
 
         elif op == EffectOpType.DEBUFF_OPP_STR:
             targets = [e for e in opp.characters_in_play if not e.has_keyword(KeywordFlag.WARD)]

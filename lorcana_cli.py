@@ -17,7 +17,7 @@ from lorcana_ai.data.deck_io import Deck
 from lorcana_ai.data.meta_decks import (
     DEFAULT_METAGAME_SHARES,
     EXPORTED_DECKS_DIR,
-    get_circle_of_life_core_counts,
+    get_archetype_core_and_baseline,
     get_metagame_shares,
     get_reference_meta_decks,
     sync_duels_ink_meta,
@@ -54,25 +54,31 @@ def cmd_sync_meta(args: argparse.Namespace) -> None:
 
 
 def cmd_optimize_core(args: argparse.Namespace) -> None:
+    core_counts, baseline_deck = get_archetype_core_and_baseline(args.archetype)
     if args.core_file and Path(args.core_file).exists():
         raw_text = Path(args.core_file).read_text(encoding="utf-8")
         core_deck = Deck.from_dreamborn_text(raw_text, name=args.archetype)
         core_counts = dict(core_deck.card_counts)
-    else:
-        core_counts = get_circle_of_life_core_counts()
+
+    if getattr(args, "baseline_file", "") and Path(args.baseline_file).exists():
+        raw_base = Path(args.baseline_file).read_text(encoding="utf-8")
+        baseline_deck = Deck.from_dreamborn_text(raw_base, name=f"{args.archetype} (Baseline)")
 
     meta_decks = get_reference_meta_decks(top_n=args.top_meta)
     meta_shares = get_metagame_shares(top_n=args.top_meta)
 
     locked_total = sum(core_counts.values())
     flex_slots = max(0, 60 - locked_total)
+    workers_arg = getattr(args, "workers", 0)
+    scanner = TechCardScanner(workers=workers_arg if workers_arg > 0 else None)
+    est_decks = (15 if "princess" in args.archetype.lower() else 13) + args.packages
+    est_total_games = est_decks * len(meta_decks) * args.games
     print(
         f"[LorcanaAlpha] Optimizing {flex_slots} Flex/Tech Slots around {locked_total}-Card Locked Core "
         f"for '{args.archetype}' vs Top {len(meta_decks)} Duels.ink Meta Decks "
-        f"(games_per_matchup={args.games}, packages={args.packages})..."
+        f"(games_per_matchup={args.games}, packages={args.packages}, workers={scanner.evaluator.workers}, ~{est_total_games:,} total games)..."
     )
 
-    scanner = TechCardScanner()
     report = scanner.optimize_core_for_duels_ink_meta(
         core_card_counts=core_counts,
         meta_decks=meta_decks,
@@ -81,52 +87,75 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
         games_per_matchup=args.games,
         package_candidates=args.packages,
         seed=args.seed,
+        baseline_deck=baseline_deck,
     )
 
-    print("\n" + "=" * 100)
-    print(f"RANKING KART TECHOWYCH DLA: {report.archetype_name} (vs Duels.ink Core Set 14 Meta)")
-    print("=" * 100)
-    for idx, te in enumerate(report.top_tech_cards[:10], 1):
+    print("\n" + "=" * 105)
+    print(f"RANKING KART TECHOWYCH I WPŁYW % NA MATCHUPY DLA: {report.archetype_name}")
+    print("=" * 105)
+    for idx, te in enumerate(report.top_tech_cards[:12], 1):
         ink_str = "Inkable" if te.inkable else "Uninkable"
+        s_bo1 = "+" if te.delta_bo1_winrate >= 0 else ""
+        s_bo3 = "+" if te.delta_bo3_winrate >= 0 else ""
+        deltas_parts = []
+        for opp_nm, d_val in te.matchup_deltas.items():
+            short_opp = opp_nm.replace("Midrange", "Mid").replace("Control", "Ctrl").replace("Good Stuff", "GS")
+            d_sign = "+" if d_val >= 0 else ""
+            w_val = te.matchup_winrates.get(opp_nm, 0.0)
+            deltas_parts.append(f"{short_opp}: {w_val*100:.0f}% ({d_sign}{d_val*100:.1f}%)")
+        deltas_line = " | ".join(deltas_parts)
         print(
             f"{idx:2d}. {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {te.recommended_copies}x\n"
-            f"    Expected BO1 WR: {te.expected_bo1_winrate*100:.1f}% | BO3 WR: {te.expected_bo3_winrate*100:.1f}% | "
-            f"Play: {te.play_winrate*100:.1f}% | Draw: {te.draw_winrate*100:.1f}% | Najlepsza na: {te.best_against}\n"
+            f"    Meta BO1 WR: {te.expected_bo1_winrate*100:.1f}% ({s_bo1}{te.delta_bo1_winrate*100:.1f}% vs baza) | "
+            f"BO3 WR: {te.expected_bo3_winrate*100:.1f}% ({s_bo3}{te.delta_bo3_winrate*100:.1f}% vs baza) | "
+            f"Play: {te.play_winrate*100:.1f}% | Draw: {te.draw_winrate*100:.1f}%\n"
+            f"    Wpływ % na matchupy: {deltas_line}\n"
             f"    Rola: {te.tactical_role}"
         )
 
-    print("\n" + "=" * 100)
+    tot_d_bo1 = report.optimized_meta_bo1_wr - report.baseline_meta_bo1_wr
+    tot_d_bo3 = report.optimized_meta_bo3_wr - report.baseline_meta_bo3_wr
+    s_tot1 = "+" if tot_d_bo1 >= 0 else ""
+    s_tot3 = "+" if tot_d_bo3 >= 0 else ""
+    print("\n" + "=" * 105)
     print(
         f"OPTYMALNY PAKIET {report.flex_slots_count} KART TECH/FLEX "
-        f"(BO1 Meta WR: {report.optimized_meta_bo1_wr*100:.1f}% [baza {report.baseline_meta_bo1_wr*100:.1f}%] | "
-        f"BO3 Meta WR: {report.optimized_meta_bo3_wr*100:.1f}% [baza {report.baseline_meta_bo3_wr*100:.1f}%])"
+        f"(BO1 Meta WR: {report.optimized_meta_bo1_wr*100:.1f}% [{s_tot1}{tot_d_bo1*100:.1f}% vs baza {report.baseline_meta_bo1_wr*100:.1f}%] | "
+        f"BO3 Meta WR: {report.optimized_meta_bo3_wr*100:.1f}% [{s_tot3}{tot_d_bo3*100:.1f}% vs baza {report.baseline_meta_bo3_wr*100:.1f}%])"
     )
-    print("=" * 100)
+    print("=" * 105)
     for cname, cnt in report.selected_flex_package.items():
         print(f"  + {cnt}x {cname}")
 
-    print("-" * 100)
-    print("WYNIKI W POSZCZEGÓLNYCH MATCHUPACH NA DUELS.INK (CORE SET 14):")
+    print("-" * 105)
+    print("SZCZEGÓŁOWY WPŁYW PROCENTOWY NA WINRATE W KAŻDYM MATCHUPIE NA DUELS.INK (CORE SET 14):")
     for opp_name, m_info in report.matchup_breakdown.items():
+        d1 = m_info.get("delta_bo1_winrate", 0.0)
+        d3 = m_info.get("delta_bo3_winrate", 0.0)
+        b1 = m_info.get("baseline_bo1_winrate", m_info["bo1_winrate"])
+        s1 = "+" if d1 >= 0 else ""
+        s3 = "+" if d3 >= 0 else ""
         print(
-            f"  vs {opp_name:<34} (Share: {m_info['meta_share']*100:4.1f}%) -> "
-            f"BO1: {m_info['bo1_winrate']*100:5.1f}% | BO3: {m_info['bo3_winrate']*100:5.1f}% | "
+            f"  vs {opp_name:<33} (Share: {m_info['meta_share']*100:4.1f}%) -> "
+            f"BO1: {m_info['bo1_winrate']*100:5.1f}% ({s1}{d1*100:5.1f}% vs baza {b1*100:4.1f}%) | "
+            f"BO3: {m_info['bo3_winrate']*100:5.1f}% ({s3}{d3*100:5.1f}%) | "
             f"Play: {m_info['play_winrate']*100:5.1f}% | Draw: {m_info['draw_winrate']*100:5.1f}%"
         )
 
-    print("-" * 100)
+    print("-" * 105)
     print(
         f"GOTOWA TALIA 60 KART ({report.optimized_deck.name} | "
         f"Uninkables: {report.optimized_deck.uninkable_count} | Avg Cost: {report.optimized_deck.average_cost:.2f}):"
     )
     print(report.optimized_deck.to_dreamborn_text())
-    print("=" * 100)
+    print("=" * 105)
 
-    deck_out_path = PROJECT_ROOT / "decks" / "amber_emerald_circle_of_life_optimized.txt"
+    slug = "princess_aggro" if "princess" in report.archetype_name.lower() else "circle_of_life"
+    deck_out_path = PROJECT_ROOT / "decks" / f"amber_emerald_{slug}_optimized.txt"
     deck_out_path.parent.mkdir(parents=True, exist_ok=True)
     deck_out_path.write_text(report.optimized_deck.to_dreamborn_text() + "\n", encoding="utf-8")
 
-    json_out_path = RESULTS_DIR / "circle_of_life_optimized_report.json"
+    json_out_path = RESULTS_DIR / f"{slug}_optimized_report.json"
     json_payload = {
         "archetype_name": report.archetype_name,
         "locked_core_count": report.locked_core_count,
@@ -135,6 +164,8 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
         "baseline_meta_bo3_wr": report.baseline_meta_bo3_wr,
         "optimized_meta_bo1_wr": report.optimized_meta_bo1_wr,
         "optimized_meta_bo3_wr": report.optimized_meta_bo3_wr,
+        "delta_meta_bo1_wr": round(tot_d_bo1, 4),
+        "delta_meta_bo3_wr": round(tot_d_bo3, 4),
         "optimized_play_wr": report.optimized_play_wr,
         "optimized_draw_wr": report.optimized_draw_wr,
         "selected_flex_package": report.selected_flex_package,
@@ -282,13 +313,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_opt = sub.add_parser(
         "optimize-core",
-        help="Find the best tech cards and 16-card flex package around the 44-card Amber/Emerald Circle of Life core vs Duels.ink meta",
+        help="Find the best tech cards, per-matchup percentage winrate impact, and 16-card flex package vs Duels.ink meta",
     )
     p_opt.add_argument("--archetype", type=str, default="Amber/Emerald Circle of Life")
-    p_opt.add_argument("--core-file", type=str, default="", help="Optional path to custom core .txt file")
+    p_opt.add_argument("--core-file", type=str, default="", help="Optional path to custom 44-card core .txt file")
+    p_opt.add_argument("--baseline-file", type=str, default="", help="Optional path to starting 60-card baseline .txt file")
     p_opt.add_argument("--top-meta", type=int, default=8, help="Number of top Duels.ink meta decks in gauntlet")
     p_opt.add_argument("--games", type=int, default=16, help="Games simulated per matchup")
     p_opt.add_argument("--packages", type=int, default=8, help="Number of candidate 16-card flex packages to evaluate")
+    p_opt.add_argument("--workers", type=int, default=0, help="Number of parallel CPU worker processes (0 = auto)")
     p_opt.add_argument("--seed", type=int, default=2026)
 
     p_train = sub.add_parser("train", help="Run Self-Play RL & Opponent Belief Network training")

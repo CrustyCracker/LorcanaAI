@@ -71,8 +71,10 @@ class BoardEntity:
             return False
         if self.exerted:
             return False
-        # CR Rule 8.16.2: Adventurous ("This character can't challenge.")
+        # CR Rule 8.16.2: Adventurous ("This character can't challenge.") or static "This character can't challenge."
         if self.has_keyword(KeywordFlag.ADVENTUROUS):
+            return False
+        if "this character can't challenge" in self.card.full_text.lower() and "unless" not in self.card.full_text.lower():
             return False
         if self.drying and not self.has_keyword(KeywordFlag.RUSH):
             return False
@@ -111,6 +113,8 @@ class PlayerState:
     ink_drops: int = 0  # CR Rule 1.13.1.2: Ink Drop Counters
     next_char_discount: int = 0  # Discount for next character played this turn (e.g. Akood et Emuti)
     inked_this_turn: bool = False
+    challenged_this_turn: bool = False
+    cant_challenge_this_turn: bool = False
     hand: list[CardTemplate] = field(default_factory=list)
     deck: list[CardTemplate] = field(default_factory=list)
     discard: list[CardTemplate] = field(default_factory=list)
@@ -166,6 +170,8 @@ class PlayerState:
             ink_drops=self.ink_drops,
             next_char_discount=self.next_char_discount,
             inked_this_turn=self.inked_this_turn,
+            challenged_this_turn=self.challenged_this_turn,
+            cant_challenge_this_turn=self.cant_challenge_this_turn,
             hand=list(self.hand),
             deck=list(self.deck),
             discard=list(self.discard),

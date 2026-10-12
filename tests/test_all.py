@@ -255,6 +255,17 @@ def test_comprehensive_rules_v2_3_0_oct_2026() -> None:
         valid_h, errs_h = hunny_deck.validate()
         assert valid_h, f"CR 1.10.1.3: Christopher Robin - Hunny Sage should permit off-color Hunny characters: {errs_h}"
 
+    # 8. Amber/Emerald Princess Aggro Mechanics (Dale Willpower Damage, Pocahontas Free 1-Drop & Peacekeeper Challenge Fog)
+    poca_guide = GLOBAL_CARD_DB.get_by_name("Pocahontas - Guiding the Tribe")
+    poca_peace = GLOBAL_CARD_DB.get_by_name("Pocahontas - Peacekeeper")
+    dale_card = GLOBAL_CARD_DB.get_by_name("Dale - Ready for His Shot")
+    pluto_card = GLOBAL_CARD_DB.get_by_name("Pluto - Friendly Pooch")
+    assert poca_guide is not None and any(cl.op == EffectOpType.PLAY_COST1_CHAR_FREE for cl in poca_guide.abilities.clauses)
+    assert poca_peace is not None and any(cl.op == EffectOpType.FOG_CHALLENGES for cl in poca_peace.abilities.clauses)
+    assert dale_card is not None and dale_card.abilities.deals_willpower_damage_in_challenges is True
+    assert pluto_card is not None and any(cl.op == EffectOpType.DISCOUNT_NEXT_CHAR and cl.requires_exert for cl in pluto_card.abilities.clauses)
+
+
 
 def test_reference_decks_and_dreamborn_io() -> None:
     decks = get_reference_meta_decks()

@@ -4,7 +4,7 @@ Serves as a fast baseline, rollout policy, and bootstrap opponent for Self-Play 
 """
 
 from __future__ import annotations
-from lorcana_ai.data.effect_dsl import EffectOpType, KeywordFlag
+from lorcana_ai.data.effect_dsl import EffectOpType, KeywordFlag, TriggerType
 from lorcana_ai.engine.game_state import GameState
 from lorcana_ai.engine.move_generator import ActionType, GameAction, MoveGenerator
 
@@ -90,15 +90,26 @@ class TacticalHeuristicAgent:
         if action.action_type == ActionType.INK_CARD:
             if p.inkwell_total >= 8 and len(p.hand) <= 2:
                 return -10.0  # Hold cards in late game if already at 8+ ink
+            max_hand_cost = max((c.cost for c in p.hand), default=0)
+            total_hand_cost = sum(p.effective_play_cost(c) for c in p.hand)
+            # Never ink a card if we ALREADY have enough payable ink this turn to play EVERY card in our hand!
+            if p.inkwell_total >= 2 and total_hand_cost <= p.total_payable_ink:
+                return -20.0
+            # Low-curve / Aggro rule: once at 4+ ink, don't ink away playable characters if hand is small and max cost <= p.inkwell_total
+            if p.inkwell_total >= 4 and len(p.hand) <= 3 and max_hand_cost <= p.inkwell_total:
+                return -15.0
             card = p.hand[action.hand_index]
             dup_count = sum(1 for c in p.hand if c.card_id == card.card_id)
             # Base score 36.0 ensures we ink BEFORE PLAY_CARD (16..34), right after any 0-ink SING_SONG draw (39+)
-            score = 36.0 if p.inkwell_total < 7 else (28.0 if len(p.hand) >= 3 else 8.0)
+            score = 36.0 if p.inkwell_total < 6 else (28.0 if len(p.hand) >= 3 else 8.0)
             if dup_count > 1:
                 score += 4.5
             # Protect Circle of Life from being inked if we only have 1 copy
             if any(cl.op == EffectOpType.REANIMATE_CHAR for cl in card.abilities.clauses) and dup_count == 1:
                 score -= 9.0
+            # Protect Pocahontas - Guiding the Tribe on Turns 1-2 if we have a 1-drop in hand
+            if any(cl.op == EffectOpType.PLAY_COST1_CHAR_FREE for cl in card.abilities.clauses) and dup_count == 1:
+                score -= 10.0
             # Protect 2-drop Characters in the first two turns if it's our only 2-drop
             two_drop_chars = sum(1 for c in p.hand if c.cost <= 2 and c.card_type == "Character")
             if card.cost <= 2 and card.card_type == "Character" and p.inkwell_total < 2 and two_drop_chars <= 1:
@@ -202,6 +213,9 @@ class TacticalHeuristicAgent:
             if any(cl.op == EffectOpType.REPLAY_SONG_FROM_DISCARD for cl in card.abilities.clauses):
                 songs_in_grave = sum(1 for c in p.discard if c.is_song and c.cost <= 4)
                 bonus += min(2, songs_in_grave) * 5.0
+            if any(cl.op == EffectOpType.FOG_CHALLENGES for cl in card.abilities.clauses):
+                if not p.challenged_this_turn and len(opp.characters_in_play) >= 1 and len(p.characters_in_play) >= 2:
+                    bonus += 14.0
             return 25.0 + card.cost * 2.0 + card.lore * 2.0 + bonus
 
         # 5. Play Card
@@ -228,6 +242,16 @@ class TacticalHeuristicAgent:
             bonus = 0.0
             if EffectOpType.BANISH_ALL_DAMAGED_OPP in ops:
                 bonus += sum(12.0 for e in opp.characters_in_play if e.damage > 0)
+            if EffectOpType.PLAY_COST1_CHAR_FREE in ops:
+                has_c1 = any(
+                    c.card_type == "Character" and c.cost <= 1 and i != action.hand_index
+                    for i, c in enumerate(p.hand)
+                )
+                if has_c1:
+                    bonus += 9.5
+            if card.abilities.deals_willpower_damage_in_challenges:
+                high_wp_allies = sum(1 for e in p.characters_in_play if e.effective_willpower >= 3 and e.effective_strength <= 1)
+                bonus += high_wp_allies * 3.0
             # Strongly prefer deploying Characters over hard-casting Songs with ink in the early/mid game!
             if card.is_song:
                 has_playable_char = any(
@@ -245,6 +269,22 @@ class TacticalHeuristicAgent:
                     bonus += 3.5
                 if card.abilities.has_underdog and state.turn_number == 2:
                     bonus += 5.0
+                if EffectOpType.DISCOUNT_NEXT_CHAR in ops and any(
+                    c.card_type == "Character" and i != action.hand_index for i, c in enumerate(p.hand)
+                ):
+                    bonus += 7.5
+                if "3 or more exerted characters" in card.full_text.lower() and len(p.characters_in_play) >= 2:
+                    bonus += 5.0
+                if action.enter_exerted:
+                    if card.abilities.keywords & KeywordFlag.BODYGUARD:
+                        if len(p.characters_in_play) >= 1:
+                            bonus += 2.5
+                    elif "whenever one of your other characters quests" in card.full_text.lower():
+                        ready_questers = sum(1 for e in p.characters_in_play if e.can_quest())
+                        if len(opp.characters_in_play) > 0 and ready_questers > 0:
+                            bonus += 3.5
+                        else:
+                            bonus -= 2.0
             return 14.0 + card.cost * 2.2 + card.lore * 2.5 + bonus
 
         # 6. Challenge vs Quest (Characters & Locations per CR Rule 4.6.8)
@@ -253,18 +293,26 @@ class TacticalHeuristicAgent:
             defender = next((e for e in opp.board if e.instance_id == action.target_instance_id), None)
             if attacker is None or defender is None:
                 return -5.0
+            p_uses_wp = any(e.card.abilities.deals_willpower_damage_in_challenges for e in p.characters_in_play)
+            opp_uses_wp = any(e.card.abilities.deals_willpower_damage_in_challenges for e in opp.characters_in_play)
+            base_atk = attacker.effective_willpower if p_uses_wp else attacker.effective_strength
             atk_pwr = (
-                attacker.effective_strength
+                base_atk
                 + attacker.card.abilities.challenger_bonus
                 + attacker.temp_challenger_mod
             )
             dmg_to_def = max(0, atk_pwr - defender.card.abilities.resist_bonus)
             if dmg_to_def <= 0:
                 return -50.0
+            base_def = (
+                0
+                if defender.card.card_type == "Location"
+                else (defender.effective_willpower if opp_uses_wp else defender.effective_strength)
+            )
             dmg_to_atk = (
                 0
                 if defender.card.card_type == "Location"
-                else max(0, defender.effective_strength - attacker.card.abilities.resist_bonus)
+                else max(0, base_def - attacker.card.abilities.resist_bonus)
             )
 
             kills_def = (defender.damage + dmg_to_def) >= defender.effective_willpower
@@ -306,12 +354,24 @@ class TacticalHeuristicAgent:
             q_lore = quester.effective_lore(p)
             if p.lore + q_lore >= 20:
                 return 1000.0  # Immediate victory!
+            # Aurora - Holding Court: quest BEFORE playing characters to apply -1 ink discount this turn!
+            if any(
+                cl.trigger == TriggerType.ON_QUEST and cl.op == EffectOpType.DISCOUNT_NEXT_CHAR
+                for cl in quester.card.abilities.clauses
+            ):
+                if any(c.card_type == "Character" for c in p.hand):
+                    return 38.5
             bonus = 0.0
             if any(cl.op == EffectOpType.REPLAY_SONG_FROM_DISCARD for cl in quester.card.abilities.clauses):
                 if any(c.is_song and c.cost <= 4 for c in p.discard):
                     bonus += 18.0
                 else:
                     bonus += 4.0
+            if any(
+                cl.trigger == TriggerType.ON_QUEST and cl.op in (EffectOpType.DRAW, EffectOpType.REVEAL_TOP_CHAR_BOTH)
+                for cl in quester.card.abilities.clauses
+            ):
+                bonus += 6.0
             return 10.0 + q_lore * 4.5 + bonus
 
         if action.action_type == ActionType.MOVE_TO_LOCATION:
@@ -326,6 +386,13 @@ class TacticalHeuristicAgent:
             if ent is None:
                 return -5.0
             for cl in ent.card.abilities.clauses:
+                if cl.op == EffectOpType.DISCOUNT_NEXT_CHAR:
+                    char_costs = [p.effective_play_cost(c) for c in p.hand if c.card_type == "Character"]
+                    needs_discount = (
+                        any(0 < cost - cl.amount <= p.total_payable_ink for cost in char_costs)
+                        and sum(char_costs) > p.total_payable_ink
+                    )
+                    return 34.5 if needs_discount else -20.0
                 if cl.op == EffectOpType.GAIN_LORE:
                     return 32.0
                 if cl.op == EffectOpType.RAMP_INK:

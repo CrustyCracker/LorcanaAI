@@ -250,6 +250,41 @@ CIRCLE_OF_LIFE_CORE_TEXT: str = """
 4 Milo Thatch - Getting His Hands Dirty
 """
 
+# User-defined 44-card locked core for Amber/Emerald Princess Aggro (leaves 16 flex/tech slots)
+PRINCESS_AGGRO_CORE_TEXT: str = """
+4 Mike Wazowski - Heroic Climber
+4 Elinor - Renowned Diplomat
+4 Grandmother Willow - Ancient Advisor
+4 Bobby Zimuruski - Spray Cheese Kid
+4 Dale - Ready for His Shot
+4 Mickey Mouse - Best in Town
+4 Aurora - Holding Court
+4 Pocahontas - Guiding the Tribe
+4 Pocahontas - Peacekeeper
+4 Thomas - Wide-Eyed Recruit
+4 Ursula - Deceiver
+"""
+
+# User's starting 60-card baseline version for Amber/Emerald Princess Aggro (44 Core + 16 Starting Flex)
+PRINCESS_AGGRO_BASELINE_TEXT: str = """
+4 Mike Wazowski - Heroic Climber (13-226)
+4 Elinor - Renowned Diplomat (12-86)
+4 Grandmother Willow - Ancient Advisor (11-206)
+4 Bobby Zimuruski - Spray Cheese Kid (9-78)
+4 Dale - Ready for His Shot (12-22)
+4 Mickey Mouse - Expedition Leader (12-26)
+4 Mickey Mouse - Best in Town (14-23)
+4 Aurora - Holding Court (9-206)
+4 Pocahontas - Guiding the Tribe (13-12)
+4 Pocahontas - Peacekeeper (11-241)
+4 Lionheart - Incumbent Mayor (14-18)
+4 Thomas - Wide-Eyed Recruit (11-1)
+4 Finnick - Tiny Terror (10-74)
+2 Pocahontas - Finding the Way (11-8)
+4 Ursula - Deceiver (3-90)
+2 The Prince - Searching for His Love (12-23)
+"""
+
 
 def get_circle_of_life_core_counts(db: CardDatabase | None = None) -> dict[int, int]:
     """Parses the 44-card locked core for Amber/Emerald Circle of Life into {card_id: count}."""
@@ -261,4 +296,39 @@ def get_circle_of_life_core_counts(db: CardDatabase | None = None) -> dict[int, 
         db=db,
     )
     return dict(core_deck.card_counts)
+
+
+def get_princess_aggro_core_counts(db: CardDatabase | None = None) -> dict[int, int]:
+    """Parses the 44-card locked core for Amber/Emerald Princess Aggro into {card_id: count}."""
+    db = db or GLOBAL_CARD_DB
+    core_deck = Deck.from_dreamborn_text(
+        PRINCESS_AGGRO_CORE_TEXT,
+        name="Amber/Emerald Princess Aggro (44-Card Core)",
+        archetype_tag="Amber/Emerald",
+        db=db,
+    )
+    return dict(core_deck.card_counts)
+
+
+def get_princess_aggro_baseline_deck(db: CardDatabase | None = None) -> Deck:
+    """Returns the user's 60-card starting baseline deck for Amber/Emerald Princess Aggro."""
+    db = db or GLOBAL_CARD_DB
+    return Deck.from_dreamborn_text(
+        PRINCESS_AGGRO_BASELINE_TEXT,
+        name="Amber/Emerald Princess Aggro (User Starting Baseline)",
+        archetype_tag="Amber/Emerald",
+        db=db,
+    )
+
+
+def get_archetype_core_and_baseline(
+    archetype_name: str,
+    db: CardDatabase | None = None,
+) -> tuple[dict[int, int], Deck | None]:
+    """Returns (core_card_counts, optional_baseline_deck) for a named archetype."""
+    db = db or GLOBAL_CARD_DB
+    if "princess" in archetype_name.lower():
+        return get_princess_aggro_core_counts(db), get_princess_aggro_baseline_deck(db)
+    return get_circle_of_life_core_counts(db), None
+
 
