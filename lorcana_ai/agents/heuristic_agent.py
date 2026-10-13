@@ -270,7 +270,7 @@ class TacticalHeuristicAgent:
                 )
                 score += ramp_cards * 5.0
 
-            # Elinor - Renowned Diplomat tournament heuristics (JDRR Guide):
+            # Elinor - Renowned Diplomat competitive heuristics:
             has_elinor_in_kept = any("elinor - renowned diplomat" in c.full_name.lower() for c in kept_cards)
             has_ramp_or_discount = any(
                 (c.cost <= 2 and any(cl.op == EffectOpType.DISCOUNT_NEXT_CHAR for cl in c.abilities.clauses))
@@ -305,7 +305,7 @@ class TacticalHeuristicAgent:
                 if has_dale and (early_drops >= 1 or has_ramp_or_discount):
                     score += 8.0  # Counter-trades and threat equalizing
 
-            # Purple Steel Droids combo assembly (JDRR Guide):
+            # Purple Steel Droids combo assembly:
             is_droid_deck = any("omnidroid" in c.full_name.lower() or "syndrome" in c.full_name.lower() for c in all_known_deck)
             if is_droid_deck:
                 droid_1c = sum(1 for c in kept_cards if c.cost == 1 and "omnidroid" in c.full_name.lower())
@@ -668,7 +668,7 @@ class TacticalHeuristicAgent:
                 # Pocahontas - Peacekeeper Shift: fogs all challenges until next turn!
                 if not p.challenged_this_turn and len(opp.characters_in_play) >= 1 and len(p.characters_in_play) >= 2:
                     bonus += 16.0
-            # Syndrome - Out for Revenge Shift (JDRR Guide): Turn 4 combo enabler
+            # Syndrome - Out for Revenge Shift: Turn 4 combo enabler
             if "syndrome" in card.full_name.lower():
                 has_robot = any("Robot" in c.subtypes or "omnidroid" in c.full_name.lower() for c in p.discard + p.hand)
                 if has_robot:
@@ -1024,7 +1024,7 @@ class TacticalHeuristicAgent:
                     if not needs_discount:
                         return -20.0
                     score = 34.5
-                    # JDRR Guideline on Pluto / Fragile ramp:
+                    # Tactical guideline on Pluto / Fragile ramp:
                     # If exerting Pluto exposes him to a free kill from an opposing 1-drop/attacker,
                     # and we don't have a Bodyguard (David) in play or entering to protect him, avoid exerting!
                     if cl.requires_exert and ent.effective_willpower <= 2:

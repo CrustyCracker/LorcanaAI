@@ -78,11 +78,11 @@ if __name__ == '__main__':
     scrape_guide(
         "https://metafy.gg/guides/view/set-13-green-yellow-princess-aggro-bG0MBBHYBuk",
         "introduction-p7gMOZT9FWN",
-        "data/guides/jddr_set13_princess_aggro.md"
+        "data/guides/set13_princess_aggro.md"
     )
     # 2. Purple Steel Droids
     scrape_guide(
         "https://metafy.gg/guides/view/set-13-purple-steel-droids-guide-6EkVcDZiujC",
         "introduction-yBuVq6gENJD",
-        "data/guides/jddr_set13_purple_steel_droids.md"
+        "data/guides/set13_purple_steel_droids.md"
     )

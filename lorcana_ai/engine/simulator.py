@@ -167,6 +167,13 @@ class LorcanaSimulator:
                                 p.board.pop(idx_b)
                                 break
 
+                if action.action_type == ActionType.SHIFT_CARD and "return all cards under it to your hand" in card.full_text.lower():
+                    for uc in under_cards:
+                        p.hand.append(uc)
+                    under_cards = []
+                    under_card = None
+                    inherited_under_count = 0
+
                 new_ent = BoardEntity(
                     instance_id=state.next_instance_id,
                     card=card,

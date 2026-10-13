@@ -232,9 +232,9 @@ class TestGameplaySimulationSuite(unittest.TestCase):
             self.assertIn(state.winner, (0, 1))
             self.assertGreaterEqual(state.players[state.winner].lore, 20)
 
-    def test_droids_resist_and_jddr_guide_heuristics(self) -> None:
+    def test_droids_resist_and_tactical_guide_heuristics(self) -> None:
         """
-        Validates Purple Steel Droids Resist mechanics and JDRR guide tactical decisions:
+        Validates Purple Steel Droids Resist mechanics and competitive tactical decisions:
         - Omnidroid V.10 gains Resist +2 with a card under it
         - Challenge damage reduction via effective_resist
         - Pluto Turn 2 risk penalty when opponent threatens free kill without bodyguard
@@ -271,7 +271,7 @@ class TestGameplaySimulationSuite(unittest.TestCase):
         LorcanaSimulator.step(state, GameAction(ActionType.CHALLENGE, source_instance_id=2, target_instance_id=1))
         self.assertEqual(ent_v10.damage, 1, "Omnidroid V.10 with Resist +2 only takes 1 damage from 3 attack")
 
-        # 3. Pluto Turn 2 risk assessment (JDRR Guide):
+        # 3. Pluto Turn 2 risk assessment:
         agent = TacticalHeuristicAgent(lookahead_depth=0)
         state_pluto = GameState.create_new_game([pluto] * 60, [queen_att] * 60, starting_player=0)
         p0_pluto = state_pluto.players[0]

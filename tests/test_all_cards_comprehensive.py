@@ -260,6 +260,7 @@ class TestAllCardsComprehensive(unittest.TestCase):
         p0 = state.players[0]
         p1 = state.players[1]
         p0.lore = 0
+        p0.hand = []
         p0.deck = [c1, c2]
 
         elinor_ent = BoardEntity(instance_id=400, card=elinor, exerted=False, drying=False)
@@ -274,6 +275,7 @@ class TestAllCardsComprehensive(unittest.TestCase):
         LorcanaSimulator._resolve_clauses(state, 0, elinor, TriggerType.END_OF_TURN, source_id=400)
         self.assertEqual(p0.lore, 0)
         self.assertEqual(opp_ent.damage, 0)
+        self.assertEqual(len(p0.hand), 0)
 
         # Case B: 3 exerted characters (exert Elinor) -> Elinor triggers all 3 effects!
         elinor_ent.exerted = True
@@ -311,9 +313,11 @@ class TestAllCardsComprehensive(unittest.TestCase):
     def test_pocahontas_peacekeeper_fogs_challenges(self) -> None:
         """Validates Pocahontas Peacekeeper shift preventing all opponent challenges."""
         pocahontas = self.db.get_by_name("Pocahontas - Peacekeeper")
+        poc_base = self.db.get_by_name("Pocahontas - Finding the Way")
         attacker = self.db.get_by_name("Queen of Hearts - Wonderland Empress")
         quester = self.db.get_by_name("Thomas - Wide-Eyed Recruit")
         self.assertIsNotNone(pocahontas)
+        self.assertIsNotNone(poc_base)
         self.assertIsNotNone(attacker)
         self.assertIsNotNone(quester)
 
@@ -321,20 +325,29 @@ class TestAllCardsComprehensive(unittest.TestCase):
         state.phase = "MAIN"
         p0 = state.players[0]
         p1 = state.players[1]
+        p0.inkwell_total = 10
+        p0.inkwell_available = 10
 
-        # Player 0 plays Pocahontas Fog clause
-        LorcanaSimulator._resolve_clauses(state, 0, pocahontas, TriggerType.ON_PLAY, is_shift=True)
-        self.assertTrue(p1.cant_challenge_this_turn)
+        # Player 0 shifts Pocahontas Peacekeeper onto base Pocahontas:
+        base_ent = BoardEntity(instance_id=600, card=poc_base, exerted=False, drying=False)
+        p0.board = [base_ent]
+        p0.hand = [pocahontas]
+
+        legal = MoveGenerator.generate_legal_actions(state)
+        shift_acts = [a for a in legal if a.action_type == ActionType.SHIFT_CARD]
+        self.assertGreaterEqual(len(shift_acts), 1)
+        LorcanaSimulator.step(state, shift_acts[0])
+        self.assertTrue(p1.cant_challenge_this_turn, "Shifted Pocahontas sets cant_challenge_this_turn on opponent")
 
         # Pass to Player 1's turn
         state.active_player = 1
         q_ent = BoardEntity(instance_id=601, card=quester, exerted=True, drying=False)
         att_ent = BoardEntity(instance_id=602, card=attacker, exerted=False, drying=False)
-        p0.board = [q_ent]
+        p0.board.append(q_ent)
         p1.board = [att_ent]
 
-        legal = MoveGenerator.generate_legal_actions(state)
-        chal_acts = [a for a in legal if a.action_type == ActionType.CHALLENGE]
+        legal_opp = MoveGenerator.generate_legal_actions(state)
+        chal_acts = [a for a in legal_opp if a.action_type == ActionType.CHALLENGE]
         self.assertEqual(len(chal_acts), 0, "Opponent cannot declare any challenge under Pocahontas Fog")
 
     # =========================================================================
