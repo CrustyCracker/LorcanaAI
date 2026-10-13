@@ -42,44 +42,72 @@ export PYTHONIOENCODING=utf-8
 export PYTHONUNBUFFERED=1
 
 echo "=================================================================="
-echo "[Athena] Running Massive Multi-Core Optimizer (~235,000+ games)"
+echo "[Athena] Running Deep Lookahead Multi-Core Optimizer (~750,000+ games)"
 echo "Grant: plgvideocnn0-gpu-a100 | Archetype: Amber/Emerald Princess Aggro"
 echo "Node: $(hostname) | CPUs: ${SLURM_CPUS_PER_TASK:-32} | Date: $(date)"
 echo "=================================================================="
 
 # 1. Optimize the 16 Flex Slots around the 44-card Locked Core against Top 10 Duels.ink Meta Decks
+#    Uses Turn-Level Lookahead (--lookahead-depth 1), 48 candidate flex packages, and 1200 games/matchup!
+#    Also automatically saves play-by-play sample game transcripts to logs/princess_aggro_sample_games.log
 python3 lorcana_cli.py optimize-core \
     --archetype "Amber/Emerald Princess Aggro" \
     --core-file decks/amber_emerald_princess_aggro_core44.txt \
     --baseline-file decks/amber_emerald_princess_aggro_baseline.txt \
     --top-meta 10 \
-    --games 500 \
-    --packages 32 \
+    --games 1200 \
+    --packages 48 \
+    --lookahead-depth 1 \
     --workers "${SLURM_CPUS_PER_TASK:-32}" \
     --seed 2026
 
-# 2. Run Targeted UCB1 Tech Scans vs the Top Opponents in Duels.ink
+# 2. Record Detailed Turn-by-Turn & Action-by-Action Replays (with Depth-2 Crackback Lookahead) into logs/
+python3 lorcana_cli.py watch-game \
+    --deck-a "Amber/Emerald Princess Aggro" \
+    --deck-b "Amber/Sapphire Detectives" \
+    --games 4 \
+    --lookahead-depth 2 \
+    --output logs/replay_princess_vs_detectives.log
+
+python3 lorcana_cli.py watch-game \
+    --deck-a "Amber/Emerald Princess Aggro" \
+    --deck-b "Emerald/Steel Midrange" \
+    --games 4 \
+    --lookahead-depth 2 \
+    --output logs/replay_princess_vs_emerald_steel.log
+
+python3 lorcana_cli.py watch-game \
+    --deck-a "Amber/Emerald Princess Aggro" \
+    --deck-b "Amber/Emerald Circle of Life" \
+    --games 4 \
+    --lookahead-depth 2 \
+    --output logs/replay_princess_vs_circle_of_life.log
+
+# 3. Run High-Budget Targeted UCB1 Tech Scans vs the Top Opponents in Duels.ink
 python3 lorcana_cli.py scan-tech \
     --my-deck "Amber/Emerald Princess Aggro" \
     --opp-deck "Amber/Sapphire Detectives" \
     --copies 3 \
-    --budget 600 \
-    --top-k 5
+    --budget 1500 \
+    --lookahead-depth 1 \
+    --top-k 6
 
 python3 lorcana_cli.py scan-tech \
     --my-deck "Amber/Emerald Princess Aggro" \
     --opp-deck "Emerald/Steel Midrange" \
     --copies 3 \
-    --budget 600 \
-    --top-k 5
+    --budget 1500 \
+    --lookahead-depth 1 \
+    --top-k 6
 
 python3 lorcana_cli.py scan-tech \
     --my-deck "Amber/Emerald Princess Aggro" \
     --opp-deck "Amber/Emerald Circle of Life" \
     --copies 3 \
-    --budget 600 \
-    --top-k 5
+    --budget 1500 \
+    --lookahead-depth 1 \
+    --top-k 6
 
 echo "[Athena] Done! Optimized decklist saved to: decks/amber_emerald_princess_aggro_optimized.txt"
 echo "[Athena] Detailed JSON report saved to:    results/princess_aggro_optimized_report.json"
-echo "[Athena] Logs saved in:                    logs/"
+echo "[Athena] Play-by-Play game replays in:     logs/princess_aggro_sample_games.log & logs/replay_princess_*.log"

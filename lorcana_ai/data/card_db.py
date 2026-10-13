@@ -236,7 +236,7 @@ class CardDatabase:
             lore = int(item.get("lore", 0) or 0)
             move_cost = int(item.get("moveCost", 1) or 1) if ctype == "Location" else 0
             rarity = str(item.get("rarity", "Common"))
-            full_text = str(item.get("fullText", "") or "")
+            full_text = " ".join(str(item.get("fullText", "") or "").split())
             kw_list = list(item.get("keywordAbilities", []) or [])
 
             abilities = EffectDSLCompiler.compile_from_text(

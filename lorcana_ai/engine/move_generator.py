@@ -115,6 +115,10 @@ class MoveGenerator:
                 continue
             seen_play_ids.add(card.card_id)
 
+            # Toulouse - Rough and Tumble (Set 14): "opponents can't play actions until the start of your next turn"
+            if card.card_type == "Action" and p.cant_play_actions_this_turn:
+                continue
+
             is_pure_reanimate = (
                 card.card_type == "Action"
                 and any(cl.op == EffectOpType.REANIMATE_CHAR for cl in card.abilities.clauses)
@@ -122,8 +126,8 @@ class MoveGenerator:
             if is_pure_reanimate and not has_char_in_discard:
                 continue
 
-            # Standard Ink Play (CR Rule 4.4 + Underdog / Akood et Emuti discounts)
-            eff_cost = p.effective_play_cost(card, is_second_player_first_turn=is_p2_first_turn)
+            # Standard Ink Play (CR Rule 4.4 + Underdog / Akood et Emuti / Aurora Princess-Queen discounts)
+            eff_cost = p.effective_play_cost(card, is_second_player_first_turn=is_p2_first_turn, opp=opp)
             if eff_cost <= payable_ink:
                 if card.card_type == "Character" and (
                     bool(card.abilities.keywords & KeywordFlag.BODYGUARD)
@@ -150,7 +154,7 @@ class MoveGenerator:
             # Shift Play — All 6 Official Shift Variants (CR Rule 8.10.8)
             shift_cost = card.abilities.shift_cost
             if shift_cost is not None:
-                eff_shift_cost = max(0, shift_cost - (p.next_char_discount if card.card_type == "Character" else 0))
+                eff_shift_cost = p.effective_shift_cost(card)
             else:
                 eff_shift_cost = 999
             if shift_cost is not None and eff_shift_cost <= payable_ink:
@@ -221,17 +225,30 @@ class MoveGenerator:
                         )
 
         # 4. Challenge exerted opposing characters AND opposing locations (CR Rule 4.6, 4.6.8, 8.3.3, 8.7.3)
-        exerted_opp_chars = [e for e in opp.characters_in_play if e.exerted]
+        opp_has_exerted_diablo = any(
+            e.exerted and "your villain characters can't be challenged" in e.card.full_text.lower()
+            for e in opp.characters_in_play
+        )
+        exerted_opp_chars = [
+            e for e in opp.characters_in_play
+            if e.exerted and not (opp_has_exerted_diablo and "Villain" in e.card.subtypes)
+        ]
         bodyguards = [e for e in exerted_opp_chars if e.has_keyword(KeywordFlag.BODYGUARD)]
         opp_locations = opp.locations_in_play
+        has_lead_detective = any(
+            "your detective characters gain alert and resist +2" in e.card.full_text.lower()
+            for e in p.characters_in_play
+        )
 
         has_forced_reckless_challenge = False
         if not p.cant_challenge_this_turn:
             for my_char in p.characters_in_play:
                 if not my_char.can_challenge():
                     continue
-                my_has_evasive = my_char.has_keyword(KeywordFlag.EVASIVE) or my_char.has_keyword(
-                    KeywordFlag.ALERT
+                my_has_evasive = (
+                    my_char.has_keyword(KeywordFlag.EVASIVE)
+                    or my_char.has_keyword(KeywordFlag.ALERT)
+                    or (has_lead_detective and "Detective" in my_char.card.subtypes)
                 )
                 valid_targets: list[BoardEntity] = []
                 # CR Rule 8.3.3: Bodyguard applies when choosing an opposing character to challenge
@@ -277,7 +294,7 @@ class MoveGenerator:
                     GameAction(
                         action_type=ActionType.QUEST,
                         source_instance_id=my_char.instance_id,
-                        description=f"Quest with {my_char.card.full_name} (+{my_char.card.lore} lore)",
+                        description=f"Quest with {my_char.card.full_name} (+{my_char.effective_lore(p, opp)} lore)",
                     )
                 )
 
@@ -349,34 +366,66 @@ class MoveGenerator:
 
         masks: dict[tuple[bool, ...], str] = {}
 
-        # Strategy A: Balanced Curve Keep (cost <= 3, max 2 uninkables)
+        # Strategy 1: Strict 1-2 Drop Characters Only (deduped, max 1 uninkable) — guarantees Turn 1 & Turn 2 plays!
+        seen_early_ids: set[int] = set()
+        unink_early = 0
+        mask_strict_early: list[bool] = []
+        for c in hand:
+            if (
+                c.card_type == "Character"
+                and c.cost <= 2
+                and c.card_id not in seen_early_ids
+                and (c.inkable or unink_early < 1)
+            ):
+                seen_early_ids.add(c.card_id)
+                if not c.inkable:
+                    unink_early += 1
+                mask_strict_early.append(True)
+            else:
+                mask_strict_early.append(False)
+        masks[tuple(mask_strict_early)] = "Mulligan: Dig for 1-2 Drop Characters"
+
+        # Strategy 2: Fast Early Game (all 1-2 drop characters + at most 1 cheap removal/3-drop if we already have a 1-2 drop)
+        has_any_1_2_char = any(c.card_type == "Character" and c.cost <= 2 for c in hand)
+        mask_early = tuple(
+            (c.card_type == "Character" and c.cost <= 2)
+            or (has_any_1_2_char and c.cost <= 3 and c.inkable)
+            for c in hand
+        )
+        masks[mask_early] = "Mulligan: Fast Early Game (Keep 1-2 drops & curve)"
+
+        # Strategy 3: Balanced Curve Keep (cost <= 3, max 2 uninkables, no duplicate 3-drops)
         unink_cnt = 0
+        seen_3_ids: set[int] = set()
         mask_curve: list[bool] = []
         for c in hand:
-            if c.cost <= 3 and (c.inkable or unink_cnt < 2):
+            if c.cost <= 3 and (c.inkable or unink_cnt < 2) and not (c.cost == 3 and c.card_id in seen_3_ids):
                 if not c.inkable:
                     unink_cnt += 1
+                if c.cost == 3:
+                    seen_3_ids.add(c.card_id)
                 mask_curve.append(True)
             else:
                 mask_curve.append(False)
         masks[tuple(mask_curve)] = "Mulligan: Balanced Curve (Keep <=3 cost)"
 
-        # Strategy B: Anti-Aggro Early Board Keep (cost <= 2 or cheap removal)
-        mask_early = tuple(
-            (c.cost <= 2) or (c.cost == 3 and c.card_type == "Action")
-            for c in hand
-        )
-        masks[mask_early] = "Mulligan: Fast Early Game (Keep 1-2 drops & removal)"
+        # Strategy 4: Hard Hunt for Turn-1 Play (keep 1-drops + at most 1 best 2-drop character)
+        kept_2_drop = False
+        mask_t1: list[bool] = []
+        for c in hand:
+            if c.card_type == "Character" and c.cost == 1:
+                mask_t1.append(True)
+            elif c.card_type == "Character" and c.cost == 2 and not kept_2_drop:
+                kept_2_drop = True
+                mask_t1.append(True)
+            else:
+                mask_t1.append(False)
+        masks[tuple(mask_t1)] = "Mulligan: Hard Hunt for Turn-1 & Turn-2 Curve"
 
-        # Strategy C: Ramp & Draw Engine Keep
-        mask_engine = tuple(
-            (c.cost <= 2 and c.inkable)
-            or ("ramp" in c.full_text.lower() or "inkwell" in c.full_text.lower() or "draw" in c.full_text.lower() and c.cost <= 4)
-            for c in hand
-        )
-        masks[mask_engine] = "Mulligan: Engine & Ramp Hunt"
+        # Strategy 5: Full 7 Reset (throw back all 7 when hand has no early curve)
+        masks[tuple(False for _ in hand)] = "Mulligan: Full 7 Reset (Dig for 1-2 drops)"
 
-        # Strategy D: Keep All
+        # Strategy 6: Keep All 7
         masks[tuple(True for _ in hand)] = "Mulligan: Keep All 7"
 
         return [

@@ -27,6 +27,7 @@ class BoardEntity:
     damage: int = 0
     temp_strength_mod: int = 0
     temp_challenger_mod: int = 0
+    temp_lore_mod: int = 0
     cards_under_count: int = 0
     boosted_this_turn: bool = False
     shifted_under_card: CardTemplate | None = None
@@ -46,14 +47,56 @@ class BoardEntity:
         return self.damage >= self.effective_willpower
 
     def has_keyword(self, kw: KeywordFlag) -> bool:
-        return bool(self.card.abilities.keywords & kw)
+        if bool(self.card.abilities.keywords & kw):
+            return True
+        # Ursula - Whisper of Vanessa (Set 10): "While there's a card under this character, she gets +1 ◊ and gains Evasive."
+        if (
+            kw == KeywordFlag.EVASIVE
+            and self.cards_under_count > 0
+            and "while there's a card under this character" in self.card.full_text.lower()
+            and "gains evasive" in self.card.full_text.lower()
+        ):
+            return True
+        return False
 
-    def effective_lore(self, owner: PlayerState | None = None) -> int:
-        base = self.card.lore
-        if owner is not None and self.card.abilities.has_five_songs_lore_bonus:
-            songs_in_discard = sum(1 for c in owner.discard if c.is_song)
-            if songs_in_discard >= 5:
-                base += 3
+    def effective_lore(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
+        base = self.card.lore + self.temp_lore_mod
+        txt_lower = self.card.full_text.lower()
+        if owner is not None:
+            if self.card.abilities.has_five_songs_lore_bonus:
+                songs_in_discard = sum(1 for c in owner.discard if c.is_song)
+                if songs_in_discard >= 5:
+                    base += 3
+            # Ursula - Whisper of Vanessa (Set 10): +1 ◊ while card under
+            if self.cards_under_count > 0 and "while there's a card under this character, she gets +1" in txt_lower:
+                base += 1
+            # Diablo - Stone Servant (Set 12): +2 ¤ and +1 ◊ while you have a Villain character in play
+            if "while you have a villain character in play" in txt_lower:
+                if any("Villain" in e.card.subtypes for e in owner.characters_in_play):
+                    base += 1
+            # Land of the Dead - Marigold Bridge (Set 14): +2 ◊ while 10+ cards in discard
+            if "while you have 10 or more cards in your discard, this location gets +2" in txt_lower:
+                if len(owner.discard) >= 10:
+                    base += 2
+            # Gadget Hackwrench - Resourceful Mechanic (Set 12): "Your characters with Support get +1 ◊."
+            if self.has_keyword(KeywordFlag.SUPPORT):
+                gadget_cnt = sum(
+                    1 for e in owner.characters_in_play if "your characters with support get +1" in e.card.full_text.lower()
+                )
+                base += gadget_cnt
+        if opp is not None:
+            # The Queen - Devious Disguise (Set 12): "While an opponent has more lore than you, this character gets +2 ◊."
+            if owner is not None and "while an opponent has more lore than you, this character gets +2" in txt_lower:
+                if opp.lore > owner.lore:
+                    base += 2
+            # Don Karnage - Debonair Pirate (Set 14): "While this character is exerted, each opposing damaged character gets -1 ◊."
+            if self.damage > 0:
+                karnage_debuff = sum(
+                    1
+                    for e in opp.characters_in_play
+                    if e.exerted and "each opposing damaged character gets -1" in e.card.full_text.lower()
+                )
+                base -= karnage_debuff
         return max(0, base)
 
     def can_quest(self) -> bool:
@@ -64,7 +107,7 @@ class BoardEntity:
         # CR Rule 8.7.2: Reckless character can't quest
         if self.has_keyword(KeywordFlag.RECKLESS):
             return False
-        return self.card.lore > 0
+        return (self.card.lore + self.temp_lore_mod) > 0
 
     def can_challenge(self) -> bool:
         if self.card.card_type != "Character":
@@ -95,6 +138,7 @@ class BoardEntity:
             damage=self.damage,
             temp_strength_mod=self.temp_strength_mod,
             temp_challenger_mod=self.temp_challenger_mod,
+            temp_lore_mod=self.temp_lore_mod,
             cards_under_count=self.cards_under_count,
             boosted_this_turn=self.boosted_this_turn,
             shifted_under_card=self.shifted_under_card,
@@ -111,10 +155,16 @@ class PlayerState:
     inkwell_total: int = 0
     inkwell_available: int = 0
     ink_drops: int = 0  # CR Rule 1.13.1.2: Ink Drop Counters
-    next_char_discount: int = 0  # Discount for next character played this turn (e.g. Akood et Emuti)
+    next_char_discount: int = 0  # Discount for next character played this turn (e.g. Grandmother Willow, Pluto, Akood et Emuti)
+    next_princess_queen_discount: int = 0  # Discount for next Princess or Queen character played this turn (Aurora - Holding Court)
     inked_this_turn: bool = False
     challenged_this_turn: bool = False
     cant_challenge_this_turn: bool = False
+    cant_play_actions_this_turn: bool = False
+    chars_played_this_turn: int = 0
+    princess_played_this_turn: bool = False
+    songs_played_this_turn: int = 0
+    cards_discarded_this_turn: int = 0
     hand: list[CardTemplate] = field(default_factory=list)
     deck: list[CardTemplate] = field(default_factory=list)
     discard: list[CardTemplate] = field(default_factory=list)
@@ -127,14 +177,67 @@ class PlayerState:
         """Total ink cost payable using ready inkwell cards + Ink Drop counters (CR Rule 1.13.1.2)."""
         return self.inkwell_available + self.ink_drops
 
-    def effective_play_cost(self, card: CardTemplate, is_second_player_first_turn: bool = False) -> int:
-        """Computes effective ink cost of playing `card` after Underdog and next-character discounts."""
+    @staticmethod
+    def is_princess_or_queen(card: CardTemplate) -> bool:
+        return "Princess" in card.subtypes or "Queen" in card.subtypes
+
+    def effective_play_cost(
+        self,
+        card: CardTemplate,
+        is_second_player_first_turn: bool = False,
+        opp: PlayerState | None = None,
+    ) -> int:
+        """
+        Computes effective ink cost of playing `card` after Underdog, general next-character discount,
+        Princess/Queen discount (Aurora - Holding Court), and Sets 9-14 conditional cost reductions.
+        """
         cost = card.cost
         if card.card_type == "Character":
             cost -= self.next_char_discount
+            if self.is_princess_or_queen(card):
+                cost -= self.next_princess_queen_discount
             if card.abilities.has_underdog and is_second_player_first_turn:
                 cost -= 1
+            txt_lower = card.full_text.lower()
+            if "for each action card in your discard, you pay 1" in txt_lower:
+                cost -= sum(1 for c in self.discard if c.card_type == "Action")
+            if "for each toy character card in your discard, you pay 1" in txt_lower:
+                cost -= sum(1 for c in self.discard if "Toy" in c.subtypes)
+            if "if you have a character named tod in play, you pay 1" in txt_lower:
+                if any(e.card.base_name == "Tod" for e in self.characters_in_play):
+                    cost -= 1
+            if "if you have a character named meilin lee in play, you pay 1" in txt_lower:
+                if any(e.card.base_name == "Meilin Lee" for e in self.characters_in_play):
+                    cost -= 1
+            if "if you played a song this turn, you pay 1" in txt_lower and self.songs_played_this_turn > 0:
+                cost -= 1
+            if (
+                ("for each card in opponents' inkwells" in txt_lower or "for each card in an opponent's inkwell" in txt_lower)
+                and opp is not None
+            ):
+                cost -= opp.inkwell_total
+            if "for each damaged character in play, you pay 1" in txt_lower:
+                dmg_cnt = sum(1 for e in self.characters_in_play if e.damage > 0)
+                if opp is not None:
+                    dmg_cnt += sum(1 for e in opp.characters_in_play if e.damage > 0)
+                cost -= dmg_cnt
         return max(0, cost)
+
+    def effective_shift_cost(self, card: CardTemplate) -> int:
+        """Computes effective ink cost of Shifting `card` after applicable character/Princess/Queen discounts."""
+        base_shift = card.abilities.shift_cost if card.abilities.shift_cost is not None else card.cost
+        if card.card_type == "Character":
+            base_shift -= self.next_char_discount
+            if self.is_princess_or_queen(card):
+                base_shift -= self.next_princess_queen_discount
+        return max(0, base_shift)
+
+    def consume_character_discounts(self, card: CardTemplate) -> None:
+        """Consumes active next-character discounts when a Character `card` is played or Shifted."""
+        if card.card_type == "Character":
+            self.next_char_discount = 0
+            if self.is_princess_or_queen(card):
+                self.next_princess_queen_discount = 0
 
     def pay_ink(self, cost: int) -> None:
         """
@@ -169,9 +272,15 @@ class PlayerState:
             inkwell_available=self.inkwell_available,
             ink_drops=self.ink_drops,
             next_char_discount=self.next_char_discount,
+            next_princess_queen_discount=self.next_princess_queen_discount,
             inked_this_turn=self.inked_this_turn,
             challenged_this_turn=self.challenged_this_turn,
             cant_challenge_this_turn=self.cant_challenge_this_turn,
+            cant_play_actions_this_turn=self.cant_play_actions_this_turn,
+            chars_played_this_turn=self.chars_played_this_turn,
+            princess_played_this_turn=self.princess_played_this_turn,
+            songs_played_this_turn=self.songs_played_this_turn,
+            cards_discarded_this_turn=self.cards_discarded_this_turn,
             hand=list(self.hand),
             deck=list(self.deck),
             discard=list(self.discard),

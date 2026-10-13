@@ -84,10 +84,11 @@ class TechCardScanner:
         cfg: DeckbuilderConfig | None = None,
         evaluator: MatchupEvaluator | None = None,
         workers: int | None = None,
+        lookahead_depth: int = 1,
     ) -> None:
         self.db = db or GLOBAL_CARD_DB
         self.cfg = cfg or DeckbuilderConfig()
-        self.evaluator = evaluator or MatchupEvaluator(workers=workers)
+        self.evaluator = evaluator or MatchupEvaluator(workers=workers, lookahead_depth=lookahead_depth)
 
     def scan_for_matchup(
         self,

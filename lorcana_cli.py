@@ -74,6 +74,8 @@ def cmd_sync_meta(args: argparse.Namespace) -> None:
 
 
 def cmd_optimize_core(args: argparse.Namespace) -> None:
+    from lorcana_ai.engine.game_replay import simulate_and_format_replay
+
     core_counts, baseline_deck = get_archetype_core_and_baseline(args.archetype)
     if args.core_file and Path(args.core_file).exists():
         raw_text = Path(args.core_file).read_text(encoding="utf-8")
@@ -90,13 +92,18 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     locked_total = sum(core_counts.values())
     flex_slots = max(0, 60 - locked_total)
     workers_arg = getattr(args, "workers", 0)
-    scanner = TechCardScanner(workers=workers_arg if workers_arg > 0 else None)
+    lookahead_depth = getattr(args, "lookahead_depth", 1)
+    scanner = TechCardScanner(
+        workers=workers_arg if workers_arg > 0 else None,
+        lookahead_depth=lookahead_depth,
+    )
     est_decks = (15 if "princess" in args.archetype.lower() else 13) + args.packages
     est_total_games = est_decks * len(meta_decks) * args.games
     print(
         f"[LorcanaAlpha] Optimizing {flex_slots} Flex/Tech Slots around {locked_total}-Card Locked Core "
         f"for '{args.archetype}' vs Top {len(meta_decks)} Duels.ink Meta Decks "
-        f"(games_per_matchup={args.games}, packages={args.packages}, workers={scanner.evaluator.workers}, ~{est_total_games:,} total games)..."
+        f"(games_per_matchup={args.games}, packages={args.packages}, lookahead_depth={lookahead_depth}, "
+        f"workers={scanner.evaluator.workers}, ~{est_total_games:,} total games)..."
     )
 
     report = scanner.optimize_core_for_duels_ink_meta(
@@ -194,8 +201,27 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
         "dreamborn_decklist": report.optimized_deck.to_dreamborn_text(),
     }
     json_out_path.write_text(json.dumps(json_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Automatically save 4 complete play-by-play sample game transcripts to logs/
+    sample_replays: list[str] = []
+    top_opps = list(meta_decks.items())[:2]
+    for o_idx, (_opp_nm, opp_d) in enumerate(top_opps):
+        for sp in (0, 1):
+            sample_replays.append(
+                simulate_and_format_replay(
+                    deck_a=report.optimized_deck,
+                    deck_b=opp_d,
+                    starting_player=sp,
+                    seed=args.seed + o_idx * 101 + sp * 37,
+                    lookahead_depth=max(1, lookahead_depth),
+                )
+            )
+    replay_path = LOG_DIR / f"{slug}_sample_games.log"
+    replay_path.write_text("\n\n".join(sample_replays) + "\n", encoding="utf-8")
+
     print(f"[OK] Zapisano gotową talię do: {deck_out_path}")
     print(f"[OK] Zapisano pełny raport JSON do: {json_out_path}")
+    print(f"[OK] Zapisano 4 pełne zapisy rozgrywek (Play-by-Play Replay) do: {replay_path}")
 
 
 def cmd_train(args: argparse.Namespace) -> None:
@@ -249,7 +275,8 @@ def cmd_scan_tech(args: argparse.Namespace) -> None:
     )
 
     print(f"[LorcanaAlpha] Scanning Tech-Cards for '{my_deck.name}' vs '{opp_deck.name}'...")
-    scanner = TechCardScanner()
+    lookahead_depth = getattr(args, "lookahead_depth", 1)
+    scanner = TechCardScanner(lookahead_depth=lookahead_depth)
     recs = scanner.scan_for_matchup(
         base_deck=my_deck,
         opponent_deck=opp_deck,
@@ -286,6 +313,47 @@ def cmd_scan_tech(args: argparse.Namespace) -> None:
         encoding="utf-8",
     )
     print(f"[OK] Saved detailed tech scan report to {out_path}")
+
+
+def cmd_watch_game(args: argparse.Namespace) -> None:
+    from lorcana_ai.engine.game_replay import simulate_and_format_replay
+
+    decks = get_reference_meta_decks()
+
+    def _resolve_deck(spec: str) -> Deck:
+        if Path(spec).exists():
+            return Deck.from_dreamborn_text(Path(spec).read_text(encoding="utf-8"), name=Path(spec).stem)
+        opt_slug = "princess_aggro" if "princess" in spec.lower() else ("circle_of_life" if "circle" in spec.lower() else "")
+        opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
+        if opt_file and opt_file.exists():
+            return Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{spec} (Optimized)")
+        _, base_d = get_archetype_core_and_baseline(spec)
+        if base_d is not None and spec.lower() in base_d.name.lower():
+            return base_d
+        return decks.get(spec) or next(
+            (d for k, d in decks.items() if spec.lower() in k.lower()),
+            list(decks.values())[0],
+        )
+
+    deck_a = _resolve_deck(args.deck_a)
+    deck_b = _resolve_deck(args.deck_b)
+    replays: list[str] = []
+    for g_idx in range(max(1, args.games)):
+        sp = g_idx % 2
+        g_seed = args.seed + g_idx * 97
+        txt = simulate_and_format_replay(
+            deck_a=deck_a,
+            deck_b=deck_b,
+            starting_player=sp,
+            seed=g_seed,
+            lookahead_depth=args.lookahead_depth,
+        )
+        print(txt)
+        replays.append(txt)
+
+    replay_out = LOG_DIR / "sample_games_replay.log"
+    replay_out.write_text("\n\n".join(replays) + "\n", encoding="utf-8")
+    print(f"\n[OK] Pełny zapis {len(replays)} gier (Play-by-Play) zapisano również do: {replay_out}")
 
 
 def cmd_evolve(args: argparse.Namespace) -> None:
@@ -355,7 +423,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt.add_argument("--games", type=int, default=16, help="Games simulated per matchup")
     p_opt.add_argument("--packages", type=int, default=8, help="Number of candidate 16-card flex packages to evaluate")
     p_opt.add_argument("--workers", type=int, default=0, help="Number of parallel CPU worker processes (0 = auto)")
+    p_opt.add_argument("--lookahead-depth", type=int, default=1, help="Turn lookahead depth (0=greedy, 1=turn rollout, 2=turn+crackback)")
     p_opt.add_argument("--seed", type=int, default=2026)
+
+    p_watch = sub.add_parser(
+        "watch-game",
+        help="Simulate and display a complete turn-by-turn, action-by-action play-by-play transcript of a Lorcana match",
+    )
+    p_watch.add_argument("--deck-a", type=str, default="Amber/Emerald Princess Aggro", help="Deck A name or .txt path")
+    p_watch.add_argument("--deck-b", type=str, default="Amber/Sapphire Detectives", help="Deck B name or .txt path")
+    p_watch.add_argument("--games", type=int, default=2, help="Number of sample games to play and log")
+    p_watch.add_argument("--lookahead-depth", type=int, default=2, help="Turn lookahead depth (1 or 2)")
+    p_watch.add_argument("--seed", type=int, default=2026)
 
     p_train = sub.add_parser("train", help="Run Self-Play RL & Opponent Belief Network training")
     p_train.add_argument("--epochs", type=int, default=5)
@@ -372,6 +451,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--copies", type=int, default=3)
     p_scan.add_argument("--budget", type=int, default=96)
     p_scan.add_argument("--top-k", type=int, default=5)
+    p_scan.add_argument("--lookahead-depth", type=int, default=1)
 
     p_evol = sub.add_parser("evolve", help="Discover and evolve new decks using MAP-Elites")
     p_evol.add_argument("--generations", type=int, default=3)
@@ -399,6 +479,8 @@ def main(argv: list[str] | None = None) -> None:
         cmd_sync_meta(args)
     elif args.command == "optimize-core":
         cmd_optimize_core(args)
+    elif args.command == "watch-game":
+        cmd_watch_game(args)
     elif args.command == "train":
         cmd_train(args)
     elif args.command == "scan-tech":

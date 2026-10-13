@@ -22,21 +22,21 @@ from lorcana_ai.engine.simulator import HAS_RUST_ENGINE, LorcanaSimulator
 if HAS_RUST_ENGINE:
     import lorcana_rs  # type: ignore
 
-_WORKER_AGENT: TacticalHeuristicAgent | None = None
+_WORKER_AGENTS: dict[int, TacticalHeuristicAgent] = {}
 
 
 def _simulate_game_range_worker(
-    args: tuple[str, dict[int, int], dict[int, int], int, int, int],
+    args: tuple[str, dict[int, int], dict[int, int], int, int, int, int],
 ) -> tuple[str, int, int, int, int, int]:
     """
     Worker function for multi-core simulation.
     Preserves exact per-game deterministic seed (`seed + i * 7919`) for Common Random Numbers (CRN).
     """
-    global _WORKER_AGENT
-    if _WORKER_AGENT is None:
-        _WORKER_AGENT = TacticalHeuristicAgent()
-
-    opp_key, counts_a, counts_b, start_i, end_i, base_seed = args
+    opp_key, counts_a, counts_b, start_i, end_i, base_seed, lookahead_depth = args
+    agent = _WORKER_AGENTS.get(lookahead_depth)
+    if agent is None:
+        agent = TacticalHeuristicAgent(lookahead_depth=lookahead_depth)
+        _WORKER_AGENTS[lookahead_depth] = agent
     cards_a = [
         GLOBAL_CARD_DB.by_id[cid]
         for cid, qty in counts_a.items()
@@ -73,7 +73,7 @@ def _simulate_game_range_worker(
             legal = MoveGenerator.generate_legal_actions(state)
             if not legal:
                 break
-            act = _WORKER_AGENT.select_action(state, legal)
+            act = agent.select_action(state, legal)
             LorcanaSimulator.step(state, act, rng=rng)
 
         winner = (
@@ -121,9 +121,10 @@ class MatchupEvaluator:
     _SHARED_POOL: ProcessPoolExecutor | None = None
     _SHARED_POOL_WORKERS: int = 0
 
-    def __init__(self, use_full_dsl_sim: bool = True, workers: int | None = None) -> None:
+    def __init__(self, use_full_dsl_sim: bool = True, workers: int | None = None, lookahead_depth: int = 1) -> None:
         self.use_full_dsl_sim = use_full_dsl_sim
-        self.agent = TacticalHeuristicAgent()
+        self.lookahead_depth = lookahead_depth
+        self.agent = TacticalHeuristicAgent(lookahead_depth=lookahead_depth)
         self.workers = workers if workers is not None else get_default_worker_count()
 
     @classmethod
@@ -181,12 +182,12 @@ class MatchupEvaluator:
         elif self.workers > 1 and num_games >= 16:
             eff_workers = min(self.workers, max(1, num_games // 4))
             chunk_size = math.ceil(num_games / eff_workers)
-            tasks: list[tuple[str, dict[int, int], dict[int, int], int, int, int]] = []
+            tasks: list[tuple[str, dict[int, int], dict[int, int], int, int, int, int]] = []
             for w_idx in range(eff_workers):
                 s_i = w_idx * chunk_size
                 e_i = min(num_games, (w_idx + 1) * chunk_size)
                 if s_i < e_i:
-                    tasks.append((deck_b.name, deck_a.card_counts, deck_b.card_counts, s_i, e_i, seed))
+                    tasks.append((deck_b.name, deck_a.card_counts, deck_b.card_counts, s_i, e_i, seed, self.lookahead_depth))
 
             pool = self._get_pool(self.workers)
             w_play = g_play = w_draw = g_draw = total_turns = 0
@@ -199,7 +200,7 @@ class MatchupEvaluator:
             avg_turns = total_turns / max(1, num_games)
         else:
             _, w_play, g_play, w_draw, g_draw, total_turns = _simulate_game_range_worker(
-                (deck_b.name, deck_a.card_counts, deck_b.card_counts, 0, num_games, seed)
+                (deck_b.name, deck_a.card_counts, deck_b.card_counts, 0, num_games, seed, self.lookahead_depth)
             )
             avg_turns = total_turns / max(1, num_games)
 
@@ -231,12 +232,12 @@ class MatchupEvaluator:
         chunks_per_opp = max(1, math.ceil((self.workers * 2) / max(1, len(meta_decks))))
         chunk_size = max(4, math.ceil(num_games / chunks_per_opp))
 
-        tasks: list[tuple[str, dict[int, int], dict[int, int], int, int, int]] = []
+        tasks: list[tuple[str, dict[int, int], dict[int, int], int, int, int, int]] = []
         for idx, (opp_name, opp_deck) in enumerate(meta_decks.items()):
             opp_seed = seed + idx * 37
             for s_i in range(0, num_games, chunk_size):
                 e_i = min(num_games, s_i + chunk_size)
-                tasks.append((opp_name, deck.card_counts, opp_deck.card_counts, s_i, e_i, opp_seed))
+                tasks.append((opp_name, deck.card_counts, opp_deck.card_counts, s_i, e_i, opp_seed, self.lookahead_depth))
 
         pool = self._get_pool(self.workers)
         agg: dict[str, list[int]] = {opp_name: [0, 0, 0, 0, 0] for opp_name in meta_decks}
