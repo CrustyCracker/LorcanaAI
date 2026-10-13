@@ -91,13 +91,28 @@ def simulate_and_format_replay(
     seed: int = 2026,
     lookahead_depth: int = 1,
     know_opponent_inks: bool = True,
+    agent_type: str = "heuristic",
+    mcts_simulations: int = 16,
+    mcts_determinizations: int = 4,
 ) -> str:
     """
     Simulates a single 1v1 game between `deck_a` (P0) and `deck_b` (P1)
     and returns a rich turn-by-turn Polish play-by-play transcript.
+    Supports either Tactical Heuristic Agent (with lookahead depth 1 or 2)
+    or Information Set MCTS (IS-MCTS with belief network determinizations).
     """
     rng = random.Random(seed)
     agent = TacticalHeuristicAgent(lookahead_depth=lookahead_depth)
+    mcts_agent = None
+    if agent_type == "is-mcts":
+        from lorcana_ai.agents.is_mcts import ISMCTSAgent
+        from lorcana_ai.config import MCTSConfig
+        m_cfg = MCTSConfig(
+            num_determinizations=mcts_determinizations,
+            simulations_per_determinization=mcts_simulations,
+        )
+        mcts_agent = ISMCTSAgent(cfg=m_cfg)
+
     cards_a = deck_a.expand_cards()
     cards_b = deck_b.expand_cards()
 
@@ -116,8 +131,9 @@ def simulate_and_format_replay(
 
     lines: list[str] = []
     lines.append("=" * 105)
+    alg_desc = f"IS-MCTS (Dets={mcts_determinizations}, Sims={mcts_simulations})" if agent_type == "is-mcts" else f"Tactical Heuristics (Lookahead Depth: {lookahead_depth})"
     lines.append(
-        f"PEŁNY ZAPIS ROZGRYWKI (PLAY-BY-PLAY REPLAY) | Seed: {seed} | Lookahead Depth: {lookahead_depth}"
+        f"PEŁNY ZAPIS ROZGRYWKI (PLAY-BY-PLAY REPLAY) | Algorytm: {alg_desc} | Seed: {seed}"
     )
     lines.append(
         f"  Gracz 0 (P0): {deck_a.name} ({'ON THE PLAY - Zaczyna' if starting_player == 0 else 'ON THE DRAW - Drugi'})"
@@ -134,10 +150,16 @@ def simulate_and_format_replay(
         p = state.players[act_p]
         before_hand = [c.full_name for c in p.hand]
         legal = MoveGenerator.generate_legal_actions(state)
-        chosen, sc, alts = agent.select_action_with_diagnostics(state, legal)
+        if mcts_agent is not None:
+            chosen, _ = mcts_agent.select_action(state, use_mcts=False, rng=rng)
+            sc = mcts_agent.heuristic.score_action(state, chosen)
+            alts = []
+        else:
+            chosen, sc, alts = agent.select_action_with_diagnostics(state, legal)
         mask = chosen.mulligan_keep_mask
         kept_names = [p.hand[i].full_name for i, k in enumerate(mask) if i < len(p.hand) and k]
         mull_names = [p.hand[i].full_name for i, k in enumerate(mask) if i < len(p.hand) and not k]
+
 
         LorcanaSimulator.step(state, chosen, rng=rng)
         after_hand = _format_hand(state.players[act_p])
@@ -193,8 +215,14 @@ def simulate_and_format_replay(
         if not legal:
             break
 
-        chosen, sc, alts = agent.select_action_with_diagnostics(state, legal)
+        if mcts_agent is not None:
+            chosen, _ = mcts_agent.select_action(state, use_mcts=True, rng=rng)
+            sc = mcts_agent.heuristic.score_action(state, chosen)
+            alts = []
+        else:
+            chosen, sc, alts = agent.select_action_with_diagnostics(state, legal)
         action_step_in_turn += 1
+
 
         # Snapshot pre-step state to explain triggered effects
         prev_p_lore = p.lore

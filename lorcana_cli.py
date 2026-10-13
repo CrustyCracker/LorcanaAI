@@ -408,9 +408,13 @@ def cmd_watch_game(args: argparse.Namespace) -> None:
             starting_player=sp,
             seed=g_seed,
             lookahead_depth=args.lookahead_depth,
+            agent_type=getattr(args, "agent", "heuristic"),
+            mcts_simulations=getattr(args, "simulations", 16),
+            mcts_determinizations=getattr(args, "determinizations", 4),
         )
         print(txt)
         replays.append(txt)
+
 
     replay_out = LOG_DIR / "sample_games_replay.log"
     replay_out.write_text("\n\n".join(replays) + "\n", encoding="utf-8")
@@ -495,7 +499,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--deck-b", type=str, default="Amber/Sapphire Detectives", help="Deck B name or .txt path")
     p_watch.add_argument("--games", type=int, default=2, help="Number of sample games to play and log")
     p_watch.add_argument("--lookahead-depth", type=int, default=2, help="Turn lookahead depth (1 or 2)")
+    p_watch.add_argument("--agent", type=str, choices=["heuristic", "is-mcts"], default="heuristic", help="Action selection algorithm (heuristic or is-mcts)")
+    p_watch.add_argument("--simulations", type=int, default=16, help="IS-MCTS simulations per determinization")
+    p_watch.add_argument("--determinizations", type=int, default=4, help="IS-MCTS number of determinizations")
     p_watch.add_argument("--seed", type=int, default=2026)
+
 
     p_train = sub.add_parser("train", help="Run Self-Play RL & Opponent Belief Network training")
     p_train.add_argument("--epochs", type=int, default=5)
