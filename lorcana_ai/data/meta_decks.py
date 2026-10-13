@@ -291,6 +291,44 @@ PRINCESS_AGGRO_BASELINE_TEXT: str = """
 """
 
 
+# User-defined 40-card locked core for Emerald/Steel Green Steel (leaves 20 flex/tech slots)
+GREEN_STEEL_CORE_TEXT: str = """
+4 Ursula - Deceiver
+1 Pegasus - Gift for Hercules
+3 Max Goof - Rebellious Teen
+4 Vixey - Forest Friend
+4 Tod - All Alone
+1 White Rabbit - Late Again
+4 Elinor - Renowned Diplomat
+2 The Queen - Devious Disguise
+2 Mushu - Stealthy Dragon
+4 Strength of a Raging Fire
+3 Angela - Night Warrior
+4 Flash - Efficient Clerk
+2 Woolter & Jesse - Bellwether's Henchmen
+2 Angel - Experiment 624
+"""
+
+# User's starting 60-card baseline version for Emerald/Steel Green Steel (most consistent)
+GREEN_STEEL_BASELINE_TEXT: str = """
+4 Ursula - Deceiver
+4 Pegasus - Gift for Hercules
+4 Max Goof - Rebellious Teen
+4 Flynn Rider - Spectral Scoundrel
+4 Vixey - Forest Friend
+4 Tod - All Alone
+4 White Rabbit - Late Again
+4 Elinor - Renowned Diplomat
+4 The Queen - Devious Disguise
+4 Mushu - Stealthy Dragon
+4 Strength of a Raging Fire
+4 Angela - Night Warrior
+4 Angel - Experiment 624
+4 Flash - Efficient Clerk
+4 Woolter & Jesse - Bellwether's Henchmen
+"""
+
+
 def get_circle_of_life_core_counts(db: CardDatabase | None = None) -> dict[int, int]:
     """Parses the 44-card locked core for Amber/Emerald Circle of Life into {card_id: count}."""
     db = db or GLOBAL_CARD_DB
@@ -326,14 +364,41 @@ def get_princess_aggro_baseline_deck(db: CardDatabase | None = None) -> Deck:
     )
 
 
+def get_green_steel_core_counts(db: CardDatabase | None = None) -> dict[int, int]:
+    """Parses the 40-card locked core for Emerald/Steel Green Steel into {card_id: count}."""
+    db = db or GLOBAL_CARD_DB
+    core_deck = Deck.from_dreamborn_text(
+        GREEN_STEEL_CORE_TEXT,
+        name="Emerald/Steel Green Steel (40-Card Core)",
+        archetype_tag="Emerald/Steel",
+        db=db,
+    )
+    return dict(core_deck.card_counts)
+
+
+def get_green_steel_baseline_deck(db: CardDatabase | None = None) -> Deck:
+    """Returns the user's 60-card starting baseline deck for Emerald/Steel Green Steel."""
+    db = db or GLOBAL_CARD_DB
+    return Deck.from_dreamborn_text(
+        GREEN_STEEL_BASELINE_TEXT,
+        name="Emerald/Steel Green Steel (Most Consistent Baseline)",
+        archetype_tag="Emerald/Steel",
+        db=db,
+    )
+
+
 def get_archetype_core_and_baseline(
     archetype_name: str,
     db: CardDatabase | None = None,
 ) -> tuple[dict[int, int], Deck | None]:
     """Returns (core_card_counts, optional_baseline_deck) for a named archetype."""
     db = db or GLOBAL_CARD_DB
-    if "princess" in archetype_name.lower():
+    name_low = archetype_name.lower()
+    if "princess" in name_low:
         return get_princess_aggro_core_counts(db), get_princess_aggro_baseline_deck(db)
+    if "steel" in name_low or "green" in name_low:
+        return get_green_steel_core_counts(db), get_green_steel_baseline_deck(db)
     return get_circle_of_life_core_counts(db), None
+
 
 

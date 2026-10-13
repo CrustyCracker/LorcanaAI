@@ -1,0 +1,641 @@
+{
+  "archetype_name": "Emerald/Steel Green Steel",
+  "locked_core_count": 40,
+  "flex_slots_count": 20,
+  "baseline_meta_bo1_wr": 0.7032,
+  "baseline_meta_bo3_wr": 0.7561,
+  "optimized_meta_bo1_wr": 0.7032,
+  "optimized_meta_bo3_wr": 0.7561,
+  "delta_meta_bo1_wr": 0.0,
+  "delta_meta_bo3_wr": 0.0,
+  "optimized_play_wr": 0.8146,
+  "optimized_draw_wr": 0.6874,
+  "selected_flex_package": {
+    "Pegasus - Gift for Hercules": 3,
+    "Max Goof - Rebellious Teen": 1,
+    "Flynn Rider - Spectral Scoundrel": 4,
+    "White Rabbit - Late Again": 3,
+    "The Queen - Devious Disguise": 2,
+    "Mushu - Stealthy Dragon": 2,
+    "Angela - Night Warrior": 1,
+    "Angel - Experiment 624": 2,
+    "Woolter & Jesse - Bellwether's Henchmen": 2
+  },
+  "top_flex_packages": [
+    {
+      "rank": 1,
+      "package_name": "Emerald/Steel Green Steel (Wersja Wyjściowa / Baseline)",
+      "flex_cards": {
+        "Pegasus - Gift for Hercules": 3,
+        "Max Goof - Rebellious Teen": 1,
+        "Flynn Rider - Spectral Scoundrel": 4,
+        "White Rabbit - Late Again": 3,
+        "The Queen - Devious Disguise": 2,
+        "Mushu - Stealthy Dragon": 2,
+        "Angela - Night Warrior": 1,
+        "Angel - Experiment 624": 2,
+        "Woolter & Jesse - Bellwether's Henchmen": 2
+      },
+      "expected_bo1_winrate": 0.7032,
+      "expected_bo3_winrate": 0.7561,
+      "delta_bo1_winrate": 0.0,
+      "delta_bo3_winrate": 0.0,
+      "play_winrate": 0.8146,
+      "draw_winrate": 0.6874,
+      "uninkable_count": 12,
+      "average_cost": 2.6,
+      "tactical_summary": "Maksymalna konsystencja krzywej i tempo Evasive (Flynn Boost + Pegasus + White Rabbit)",
+      "dreamborn_decklist": "4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n4 Ursula - Deceiver\n4 White Rabbit - Late Again\n4 Angela - Night Warrior\n4 Max Goof - Rebellious Teen\n4 Mushu - Stealthy Dragon\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n4 Woolter & Jesse - Bellwether's Henchmen\n4 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n4 The Queen - Devious Disguise"
+    },
+    {
+      "rank": 2,
+      "package_name": "Emerald/Steel Green Steel [Optimized v5]",
+      "flex_cards": {
+        "Pegasus - Gift for Hercules": 3,
+        "White Rabbit - Late Again": 3,
+        "Woolter & Jesse - Bellwether's Henchmen": 2,
+        "Angel - Experiment 624": 2,
+        "Flynn Rider - Spectral Scoundrel": 4,
+        "Tod & Copper - Best of Friends": 3,
+        "Inspector Tezuka - Resolute Officer": 3
+      },
+      "expected_bo1_winrate": 0.5806,
+      "expected_bo3_winrate": 0.621,
+      "delta_bo1_winrate": -0.1226,
+      "delta_bo3_winrate": -0.1351,
+      "play_winrate": 0.4759,
+      "draw_winrate": 0.6854,
+      "uninkable_count": 12,
+      "average_cost": 2.57,
+      "tactical_summary": "Synergia Tod & Copper (z 4x Tod w rdzeniu) + wsparcie defensywne Bodyguard",
+      "dreamborn_decklist": "4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n3 Inspector Tezuka - Resolute Officer\n4 Ursula - Deceiver\n4 White Rabbit - Late Again\n3 Angela - Night Warrior\n3 Max Goof - Rebellious Teen\n2 Mushu - Stealthy Dragon\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n4 Woolter & Jesse - Bellwether's Henchmen\n4 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n2 The Queen - Devious Disguise\n3 Tod & Copper - Best of Friends"
+    },
+    {
+      "rank": 3,
+      "package_name": "Emerald/Steel Green Steel [Optimized v4]",
+      "flex_cards": {
+        "Pegasus - Gift for Hercules": 3,
+        "White Rabbit - Late Again": 3,
+        "The Queen - Devious Disguise": 2,
+        "Mushu - Stealthy Dragon": 2,
+        "Flynn Rider - Spectral Scoundrel": 4,
+        "Sudden Chill": 3,
+        "Cursed Merfolk - Ursula's Handiwork": 3
+      },
+      "expected_bo1_winrate": 0.5339,
+      "expected_bo3_winrate": 0.5498,
+      "delta_bo1_winrate": -0.1693,
+      "delta_bo3_winrate": -0.2063,
+      "play_winrate": 0.3804,
+      "draw_winrate": 0.6874,
+      "uninkable_count": 13,
+      "average_cost": 2.42,
+      "tactical_summary": "Hand Disruption & Aggro Punish: niszczenie ręki rywala (Cursed Merfolk, Sudden Chill, Ursula)",
+      "dreamborn_decklist": "3 Cursed Merfolk - Ursula's Handiwork\n4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n3 Sudden Chill\n4 Ursula - Deceiver\n4 White Rabbit - Late Again\n3 Angela - Night Warrior\n3 Max Goof - Rebellious Teen\n4 Mushu - Stealthy Dragon\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n2 Woolter & Jesse - Bellwether's Henchmen\n2 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n4 The Queen - Devious Disguise"
+    },
+    {
+      "rank": 4,
+      "package_name": "Emerald/Steel Green Steel [Optimized v2]",
+      "flex_cards": {
+        "Pegasus - Gift for Hercules": 3,
+        "White Rabbit - Late Again": 3,
+        "Woolter & Jesse - Bellwether's Henchmen": 2,
+        "Angel - Experiment 624": 2,
+        "Flynn Rider - Spectral Scoundrel": 4,
+        "Smash": 3,
+        "Look What You've Done": 3
+      },
+      "expected_bo1_winrate": 0.4879,
+      "expected_bo3_winrate": 0.4819,
+      "delta_bo1_winrate": -0.2153,
+      "delta_bo3_winrate": -0.2742,
+      "play_winrate": 0.2905,
+      "draw_winrate": 0.6854,
+      "uninkable_count": 12,
+      "average_cost": 2.52,
+      "tactical_summary": "Kontrola stołu i pingi: bezpośredni removal Smash (3 dmg) + Look What You've Done (synergia z Angel)",
+      "dreamborn_decklist": "4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n3 Look What You've Done\n4 Ursula - Deceiver\n4 White Rabbit - Late Again\n3 Angela - Night Warrior\n3 Max Goof - Rebellious Teen\n2 Mushu - Stealthy Dragon\n3 Smash\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n4 Woolter & Jesse - Bellwether's Henchmen\n4 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n2 The Queen - Devious Disguise"
+    },
+    {
+      "rank": 5,
+      "package_name": "Emerald/Steel Green Steel [Optimized v3]",
+      "flex_cards": {
+        "Pegasus - Gift for Hercules": 3,
+        "Max Goof - Rebellious Teen": 1,
+        "White Rabbit - Late Again": 2,
+        "The Queen - Devious Disguise": 2,
+        "Mushu - Stealthy Dragon": 2,
+        "Flynn Rider - Spectral Scoundrel": 4,
+        "Malicious, Mean, and Scary": 3,
+        "Strike a Good Match": 3
+      },
+      "expected_bo1_winrate": 0.5048,
+      "expected_bo3_winrate": 0.4585,
+      "delta_bo1_winrate": -0.1984,
+      "delta_bo3_winrate": -0.2977,
+      "play_winrate": 0.195,
+      "draw_winrate": 0.8146,
+      "uninkable_count": 10,
+      "average_cost": 2.53,
+      "tactical_summary": "Silnik pieśni i AoE: Malicious (1 dmg AoE) + Strike a Good Match + rekurencja z Max Goof",
+      "dreamborn_decklist": "4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n3 Strike a Good Match\n4 Ursula - Deceiver\n3 White Rabbit - Late Again\n3 Angela - Night Warrior\n3 Malicious, Mean, and Scary\n4 Max Goof - Rebellious Teen\n4 Mushu - Stealthy Dragon\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n2 Woolter & Jesse - Bellwether's Henchmen\n2 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n4 The Queen - Devious Disguise"
+    }
+  ],
+  "top_tech_cards": [
+    {
+      "card_name": "Robin Hood - Champion of Sherwood",
+      "card_id": 178,
+      "cost": 5,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 2,
+      "expected_bo1_winrate": 0.751,
+      "expected_bo3_winrate": 0.8278,
+      "delta_bo1_winrate": 0.0478,
+      "delta_bo3_winrate": 0.0716,
+      "play_winrate": 0.8146,
+      "draw_winrate": 0.6874,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.75,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.5
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": 0.0,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "best_against": "Emerald/Steel Midrange (+25.0%)",
+      "tactical_role": "Finisher (5 ink, Shift 3, 3/6/2, Inkable): przy wygnaniu postaci rywala dobiera kartę i generuje dodatkowe Lore."
+    },
+    {
+      "card_name": "Cursed Merfolk - Ursula's Handiwork",
+      "card_id": 72,
+      "cost": 1,
+      "inkable": false,
+      "card_type": "Character",
+      "recommended_copies": 2,
+      "expected_bo1_winrate": 0.7023,
+      "expected_bo3_winrate": 0.8034,
+      "delta_bo1_winrate": -0.001,
+      "delta_bo3_winrate": 0.0473,
+      "play_winrate": 0.7191,
+      "draw_winrate": 0.6854,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.75,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.5
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": 0.0,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "best_against": "Emerald/Steel Midrange (+25.0%)",
+      "tactical_role": "Agresywny 1-drop (0/1/2, Uninkable): wywiera szybką presję questowania, a jeśli rywal zdecyduje się go wyzwać, musi odrzucić kartę ze swojej ręki."
+    },
+    {
+      "card_name": "Flynn Rider - Spectral Scoundrel",
+      "card_id": 286,
+      "cost": 1,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 4,
+      "expected_bo1_winrate": 0.7032,
+      "expected_bo3_winrate": 0.7561,
+      "delta_bo1_winrate": 0.251,
+      "delta_bo3_winrate": 0.3278,
+      "play_winrate": 0.7191,
+      "draw_winrate": 0.6874,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.75,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": 0.25,
+        "Amber/Emerald Princess Aggro": 0.25,
+        "Amber/Sapphire Control": 0.5,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+50.0%)",
+      "tactical_role": "1-drop (1/2/1, Inkable) z Boost 2: po dopłaceniu 2 ink staje się 3/2 z 2 Lore — wywiera natychmiastową presję punktową i wymusza niekorzystne wymiany na rywalu."
+    },
+    {
+      "card_name": "Fire the Cannons!",
+      "card_id": 201,
+      "cost": 1,
+      "inkable": false,
+      "card_type": "Action",
+      "recommended_copies": 2,
+      "expected_bo1_winrate": 0.7032,
+      "expected_bo3_winrate": 0.7561,
+      "delta_bo1_winrate": 0.0,
+      "delta_bo3_winrate": 0.0,
+      "play_winrate": 0.7191,
+      "draw_winrate": 0.6874,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.75,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": 0.0,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Szybki 1-drop removal (1 ink, Uninkable): zadaje 2 obrażenia wybranej postaci — eliminuje wrogie 1-dropy w 1. turze."
+    },
+    {
+      "card_name": "Sudden Chill",
+      "card_id": 96,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.6096,
+      "expected_bo3_winrate": 0.6643,
+      "delta_bo1_winrate": -0.0937,
+      "delta_bo3_winrate": -0.0918,
+      "play_winrate": 0.8146,
+      "draw_winrate": 0.4045,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.5
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "best_against": "Emerald/Steel Midrange (+25.0%)",
+      "tactical_role": "Inkowalna pieśń (2 ink, śpiewana za darmo): zmusza każdego przeciwnika do odrzucenia karty — w połączeniu z 'Ursula - Deceiver' wyczerpuje zasoby przeciwnika kontrolnego (Hand Disruption)."
+    },
+    {
+      "card_name": "Diablo - Protecting His Mistress",
+      "card_id": 1010,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.6096,
+      "expected_bo3_winrate": 0.6643,
+      "delta_bo1_winrate": -0.0937,
+      "delta_bo3_winrate": -0.0918,
+      "play_winrate": 0.8146,
+      "draw_winrate": 0.4045,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.5
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "best_against": "Emerald/Steel Midrange (+25.0%)",
+      "tactical_role": "2-drop Evasive (3/2/1, Inkable): agresywne ciało Evasive, trudne do zlikwidowania w wyzwaniach dla talii bez Evasive."
+    },
+    {
+      "card_name": "Fergus - King of DunBroch",
+      "card_id": 788,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5628,
+      "expected_bo3_winrate": 0.5932,
+      "delta_bo1_winrate": -0.1404,
+      "delta_bo3_winrate": -0.1629,
+      "play_winrate": 0.6236,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": -0.25
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Inkowalny 2-drop Bodyguard (3/2/1): wchodzi wytapowany pod Elinor i ma aż 3 ataku w wyzwaniach defensywnych."
+    },
+    {
+      "card_name": "Strike a Good Match",
+      "card_id": 503,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5618,
+      "expected_bo3_winrate": 0.5927,
+      "delta_bo1_winrate": -0.1414,
+      "delta_bo3_winrate": -0.1634,
+      "play_winrate": 0.7191,
+      "draw_winrate": 0.4045,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Emerald Princess Aggro (+0.0%)",
+      "tactical_role": "Inkowalna pieśń (2 ink, śpiewana za darmo przez Ursula, White Rabbit, Tod): dobiera 2 karty i odrzuca 1 — przekopuje talię po Elinor / Strength of a Raging Fire i może być cofana przez 'Max Goof - Rebellious Teen'."
+    },
+    {
+      "card_name": "Malicious, Mean, and Scary",
+      "card_id": 302,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5618,
+      "expected_bo3_winrate": 0.5927,
+      "delta_bo1_winrate": -0.1414,
+      "delta_bo3_winrate": -0.1634,
+      "play_winrate": 0.7191,
+      "draw_winrate": 0.4045,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Emerald Princess Aggro (+0.0%)",
+      "tactical_role": "Inkowalna pieśń (3 ink, śpiewana przez Mushu, Angela, Vixey, Woolter): kładzie po 1 obrażeniu na każdą wrogą postać (AoE) — czyści tokeny aggro i ułatwia dobijanie z 'Strength of a Raging Fire' lub 'Elinor'."
+    },
+    {
+      "card_name": "Inspector Tezuka - Resolute Officer",
+      "card_id": 382,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5141,
+      "expected_bo3_winrate": 0.5688,
+      "delta_bo1_winrate": -0.1892,
+      "delta_bo3_winrate": -0.1873,
+      "play_winrate": 0.6236,
+      "draw_winrate": 0.4045,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.75,
+        "Amber/Sapphire Control": 0.75,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": 0.0,
+        "Amber/Sapphire Control": -0.25,
+        "Emerald/Steel Midrange": -0.25
+      },
+      "best_against": "Amber/Emerald Princess Aggro (+0.0%)",
+      "tactical_role": "Inkowalny 2-drop Bodyguard (2/3/1): wchodzi wytapowany, chroniąc Twoje 1-dropy (Tod, Pegasus, Flynn) i od razu spełnia warunek 3+ wytapowanych postaci pod 'Elinor - Renowned Diplomat'."
+    },
+    {
+      "card_name": "Smash",
+      "card_id": 199,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5497,
+      "expected_bo3_winrate": 0.5259,
+      "delta_bo1_winrate": -0.1535,
+      "delta_bo3_winrate": -0.2303,
+      "play_winrate": 0.5975,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Kluczowy removal (3 ink, Action, Inkable): zadaje bezwarunkowo 3 obrażenia wrogiej postaci — natychmiast likwiduje kluczowe zagrożenia rywala (np. Ursula - Vanessa, Dale, Kuzco, Flynn) przed ich aktywacją."
+    },
+    {
+      "card_name": "Tod & Copper - Best of Friends",
+      "card_id": 911,
+      "cost": 4,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5497,
+      "expected_bo3_winrate": 0.5259,
+      "delta_bo1_winrate": -0.1535,
+      "delta_bo3_winrate": -0.2303,
+      "play_winrate": 0.5975,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Potężny 4-drop (3/3/2, Inkable): bezbłędna synergia z 4x 'Tod - All Alone' w rdzeniu talii — nagradza granie Todem i daje cenne 2 punkty Lore."
+    },
+    {
+      "card_name": "Benja - Guardian of the Dragon Gem",
+      "card_id": 181,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5497,
+      "expected_bo3_winrate": 0.5259,
+      "delta_bo1_winrate": -0.1535,
+      "delta_bo3_winrate": -0.2303,
+      "play_winrate": 0.5975,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Inkowalny 3-drop (2/3/2): na wejściu niszczy wybrany przedmiot rywala (Pawpsicle, Fishbone Quill, Fortisphere) i questuje za 2 Lore."
+    },
+    {
+      "card_name": "Three Arrows",
+      "card_id": 810,
+      "cost": 3,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5497,
+      "expected_bo3_winrate": 0.5259,
+      "delta_bo1_winrate": -0.1535,
+      "delta_bo3_winrate": -0.2303,
+      "play_winrate": 0.5975,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Inkowalna akcja (3 ink): zadaje 2 obrażenia wybranej postaci, a następnie 1 obrażenie innej postaci rywala (split-damage)."
+    },
+    {
+      "card_name": "Bobby Zimuruski - Spray Cheese Kid",
+      "card_id": 79,
+      "cost": 1,
+      "inkable": true,
+      "card_type": "Character",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.5497,
+      "expected_bo3_winrate": 0.5259,
+      "delta_bo1_winrate": -0.1535,
+      "delta_bo3_winrate": -0.2303,
+      "play_winrate": 0.5975,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.25
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Wspiera krzywą (1 ink) i synergię Evasive/Removal/Elinor w talii Emerald/Steel Green Steel."
+    },
+    {
+      "card_name": "Look What You've Done",
+      "card_id": 1017,
+      "cost": 2,
+      "inkable": true,
+      "card_type": "Action",
+      "recommended_copies": 3,
+      "expected_bo1_winrate": 0.502,
+      "expected_bo3_winrate": 0.502,
+      "delta_bo1_winrate": -0.2012,
+      "delta_bo3_winrate": -0.2541,
+      "play_winrate": 0.502,
+      "draw_winrate": 0.502,
+      "matchup_winrates": {
+        "Amber/Emerald Circle of Life": 0.5,
+        "Amber/Emerald Princess Aggro": 0.5,
+        "Amber/Sapphire Control": 1.0,
+        "Emerald/Steel Midrange": 0.0
+      },
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Emerald Princess Aggro": -0.25,
+        "Amber/Sapphire Control": 0.0,
+        "Emerald/Steel Midrange": -0.25
+      },
+      "best_against": "Amber/Sapphire Control (+0.0%)",
+      "tactical_role": "Inkowalny 2-drop removal (2 ink, Action): zadaje 2 obrażenia; dodatkowo gdy zostanie odrzucony (np. przez 'Angel - Experiment 624'), możesz zagrać go natychmiast ze swojego cmentarza!"
+    }
+  ],
+  "matchup_breakdown": {
+    "Amber/Emerald Circle of Life": {
+      "meta_share": 0.3708,
+      "bo1_winrate": 0.75,
+      "bo3_winrate": 0.875,
+      "play_winrate": 0.5,
+      "draw_winrate": 1.0,
+      "baseline_bo1_winrate": 0.75,
+      "delta_bo1_winrate": 0.0,
+      "baseline_bo3_winrate": 0.875,
+      "delta_bo3_winrate": 0.0
+    },
+    "Amber/Emerald Princess Aggro": {
+      "meta_share": 0.2432,
+      "bo1_winrate": 0.75,
+      "bo3_winrate": 0.875,
+      "play_winrate": 1.0,
+      "draw_winrate": 0.5,
+      "baseline_bo1_winrate": 0.75,
+      "delta_bo1_winrate": 0.0,
+      "baseline_bo3_winrate": 0.875,
+      "delta_bo3_winrate": 0.0
+    },
+    "Amber/Sapphire Control": {
+      "meta_share": 0.195,
+      "bo1_winrate": 1.0,
+      "bo3_winrate": 1.0,
+      "play_winrate": 1.0,
+      "draw_winrate": 1.0,
+      "baseline_bo1_winrate": 1.0,
+      "delta_bo1_winrate": 0.0,
+      "baseline_bo3_winrate": 1.0,
+      "delta_bo3_winrate": 0.0
+    },
+    "Emerald/Steel Midrange": {
+      "meta_share": 0.191,
+      "bo1_winrate": 0.25,
+      "bo3_winrate": 0.125,
+      "play_winrate": 0.5,
+      "draw_winrate": 0.0,
+      "baseline_bo1_winrate": 0.25,
+      "delta_bo1_winrate": 0.0,
+      "baseline_bo3_winrate": 0.125,
+      "delta_bo3_winrate": 0.0
+    }
+  },
+  "dreamborn_decklist": "4 Flynn Rider - Spectral Scoundrel\n4 Pegasus - Gift for Hercules\n4 Tod - All Alone\n4 Flash - Efficient Clerk\n4 Ursula - Deceiver\n4 White Rabbit - Late Again\n4 Angela - Night Warrior\n4 Max Goof - Rebellious Teen\n4 Mushu - Stealthy Dragon\n4 Strength of a Raging Fire\n4 Vixey - Forest Friend\n4 Woolter & Jesse - Bellwether's Henchmen\n4 Angel - Experiment 624\n4 Elinor - Renowned Diplomat\n4 The Queen - Devious Disguise"
+}

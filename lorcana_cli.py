@@ -11,6 +11,18 @@ from pathlib import Path
 import sys
 import time
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+
 from lorcana_ai.config import CHECKPOINT_DIR, LOG_DIR, PROJECT_ROOT, RESULTS_DIR, MCTSConfig
 from lorcana_ai.data.card_db import GLOBAL_CARD_DB
 from lorcana_ai.data.deck_io import Deck
@@ -144,9 +156,29 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     tot_d_bo3 = report.optimized_meta_bo3_wr - report.baseline_meta_bo3_wr
     s_tot1 = "+" if tot_d_bo1 >= 0 else ""
     s_tot3 = "+" if tot_d_bo3 >= 0 else ""
+
+    if report.top_flex_packages:
+        print("\n" + "=" * 105)
+        print(f"TOP {len(report.top_flex_packages)} NAJLEPSZYCH KOMBINACJI TECHÓW (PAKIETY FLEX) DLA: {report.archetype_name}")
+        print("=" * 105)
+        for pkg in report.top_flex_packages:
+            ps1 = "+" if pkg.delta_bo1_winrate >= 0 else ""
+            ps3 = "+" if pkg.delta_bo3_winrate >= 0 else ""
+            best_tag = " ★ [WYBÓR #1 - NAJLEPSZY PAKIET]" if pkg.rank == 1 else ""
+            print(
+                f"\n[KOMBINACJA #{pkg.rank}]{best_tag} {pkg.package_name}\n"
+                f"  Meta BO1 WR: {pkg.expected_bo1_winrate*100:5.1f}% ({ps1}{pkg.delta_bo1_winrate*100:5.1f}% vs baza) | "
+                f"BO3 WR: {pkg.expected_bo3_winrate*100:5.1f}% ({ps3}{pkg.delta_bo3_winrate*100:5.1f}% vs baza)\n"
+                f"  Play WR: {pkg.play_winrate*100:5.1f}% | Draw WR: {pkg.draw_winrate*100:5.1f}% | "
+                f"Uninkables: {pkg.uninkable_count:2d} | Średni koszt: {pkg.average_cost:.2f}\n"
+                f"  Karty pakietu ({sum(pkg.flex_cards.values())} kart): "
+                f"{', '.join(f'+{cnt}x {cname}' for cname, cnt in pkg.flex_cards.items())}\n"
+                f"  Rola taktyczna: {pkg.tactical_summary}"
+            )
+
     print("\n" + "=" * 105)
     print(
-        f"OPTYMALNY PAKIET {report.flex_slots_count} KART TECH/FLEX "
+        f"SZCZEGÓŁY NAJLEPSZEJ KOMBINACJI (#1) — PAKIET {report.flex_slots_count} KART TECH/FLEX\n"
         f"(BO1 Meta WR: {report.optimized_meta_bo1_wr*100:.1f}% [{s_tot1}{tot_d_bo1*100:.1f}% vs baza {report.baseline_meta_bo1_wr*100:.1f}%] | "
         f"BO3 Meta WR: {report.optimized_meta_bo3_wr*100:.1f}% [{s_tot3}{tot_d_bo3*100:.1f}% vs baza {report.baseline_meta_bo3_wr*100:.1f}%])"
     )
@@ -177,8 +209,18 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     print(report.optimized_deck.to_dreamborn_text())
     print("=" * 105)
 
-    slug = "princess_aggro" if "princess" in report.archetype_name.lower() else "circle_of_life"
-    deck_out_path = PROJECT_ROOT / "decks" / f"amber_emerald_{slug}_optimized.txt"
+    name_low = report.archetype_name.lower()
+    if "princess" in name_low:
+        slug = "princess_aggro"
+        out_filename = "amber_emerald_princess_aggro_optimized.txt"
+    elif "steel" in name_low or "green" in name_low:
+        slug = "green_steel"
+        out_filename = "emerald_steel_green_steel_optimized.txt"
+    else:
+        slug = "circle_of_life"
+        out_filename = "amber_emerald_circle_of_life_optimized.txt"
+
+    deck_out_path = PROJECT_ROOT / "decks" / out_filename
     deck_out_path.parent.mkdir(parents=True, exist_ok=True)
     deck_out_path.write_text(report.optimized_deck.to_dreamborn_text() + "\n", encoding="utf-8")
 
@@ -196,6 +238,24 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
         "optimized_play_wr": report.optimized_play_wr,
         "optimized_draw_wr": report.optimized_draw_wr,
         "selected_flex_package": report.selected_flex_package,
+        "top_flex_packages": [
+            {
+                "rank": p.rank,
+                "package_name": p.package_name,
+                "flex_cards": p.flex_cards,
+                "expected_bo1_winrate": p.expected_bo1_winrate,
+                "expected_bo3_winrate": p.expected_bo3_winrate,
+                "delta_bo1_winrate": p.delta_bo1_winrate,
+                "delta_bo3_winrate": p.delta_bo3_winrate,
+                "play_winrate": p.play_winrate,
+                "draw_winrate": p.draw_winrate,
+                "uninkable_count": p.uninkable_count,
+                "average_cost": p.average_cost,
+                "tactical_summary": p.tactical_summary,
+                "dreamborn_decklist": p.deck.to_dreamborn_text(),
+            }
+            for p in getattr(report, "top_flex_packages", [])
+        ],
         "top_tech_cards": [te.__dict__ for te in report.top_tech_cards],
         "matchup_breakdown": report.matchup_breakdown,
         "dreamborn_decklist": report.optimized_deck.to_dreamborn_text(),
@@ -222,6 +282,7 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     print(f"[OK] Zapisano gotową talię do: {deck_out_path}")
     print(f"[OK] Zapisano pełny raport JSON do: {json_out_path}")
     print(f"[OK] Zapisano 4 pełne zapisy rozgrywek (Play-by-Play Replay) do: {replay_path}")
+
 
 
 def cmd_train(args: argparse.Namespace) -> None:

@@ -55,8 +55,27 @@ class MetaTechCardEvaluation:
 
 
 @dataclass
+class FlexPackageRecommendation:
+    """A ranked synergistic flex-slot package combination evaluated against the meta gauntlet."""
+    rank: int
+    package_name: str
+    flex_cards: dict[str, int]
+    expected_bo1_winrate: float
+    expected_bo3_winrate: float
+    delta_bo1_winrate: float
+    delta_bo3_winrate: float
+    play_winrate: float
+    draw_winrate: float
+    uninkable_count: int
+    average_cost: float
+    deck: Deck
+    matchup_breakdown: dict[str, dict[str, float]] = field(default_factory=dict)
+    tactical_summary: str = ""
+
+
+@dataclass
 class CoreOptimizationReport:
-    """Result of optimizing the flex slots (e.g. 16 cards) around a locked core (e.g. 44 cards)."""
+    """Result of optimizing the flex slots around a locked core."""
     archetype_name: str
     locked_core_count: int
     flex_slots_count: int
@@ -70,6 +89,8 @@ class CoreOptimizationReport:
     selected_flex_package: dict[str, int]
     optimized_deck: Deck
     matchup_breakdown: dict[str, dict[str, float]]
+    top_flex_packages: list[FlexPackageRecommendation] = field(default_factory=list)
+
 
 
 class TechCardScanner:
@@ -252,6 +273,7 @@ class TechCardScanner:
         locked_total = sum(core_card_counts.values())
         flex_needed = max(0, 60 - locked_total)
         is_princess_aggro = "princess" in archetype_name.lower()
+        is_green_steel = "steel" in archetype_name.lower() or "green" in archetype_name.lower()
 
         inks_set: set[str] = set()
         core_base_names: set[str] = set()
@@ -260,7 +282,7 @@ class TechCardScanner:
                 c = self.db.by_id[cid]
                 inks_set.update(c.inks)
                 core_base_names.add(c.base_name)
-        inks = tuple(sorted(inks_set)) or ("Amber", "Emerald")
+        inks = tuple(sorted(inks_set)) or ("Emerald", "Steel" if is_green_steel else ("Amber", "Emerald"))
 
         # 1. Identify high-value candidate tech cards for the flex slots
         legal_pool = [
@@ -273,6 +295,12 @@ class TechCardScanner:
                 reverse=True,
             )
             shortlist = legal_pool[:14]
+        elif is_green_steel:
+            legal_pool.sort(
+                key=lambda c: self._score_green_steel_synergy(c, core_base_names),
+                reverse=True,
+            )
+            shortlist = legal_pool[:18]
         else:
             legal_pool.sort(
                 key=lambda c: self._score_circle_of_life_synergy(c, core_base_names),
@@ -307,6 +335,19 @@ class TechCardScanner:
                 "Nani - Stage Manager",
                 "Rapunzel - Tower Defender",
             ]
+        elif is_green_steel:
+            balanced_shell_names = [
+                "Flynn Rider - Spectral Scoundrel",
+                "Smash",
+                "Strike a Good Match",
+                "Look What You've Done",
+                "Pegasus - Gift for Hercules",
+                "White Rabbit - Late Again",
+                "The Queen - Devious Disguise",
+                "Mushu - Stealthy Dragon",
+                "Angel - Experiment 624",
+                "Woolter & Jesse - Bellwether's Henchmen",
+            ]
         else:
             balanced_shell_names = [
                 "Max Goof - Chart Topper",
@@ -329,9 +370,11 @@ class TechCardScanner:
         best_single_draw = sum(b["draw_winrate"] * b["meta_share"] for b in base_breakdown.values()) / max(1e-6, sum(b["meta_share"] for b in base_breakdown.values()))
         best_single_breakdown: dict[str, dict[str, float]] = dict(base_breakdown)
 
-        eval_count = 14 if is_princess_aggro else 12
+        eval_count = 16 if is_green_steel else (14 if is_princess_aggro else 12)
         for idx, cand in enumerate(shortlist[:eval_count]):
-            rec_copies = self._recommended_copies_for_tech(cand, is_princess_aggro=is_princess_aggro)
+            rec_copies = self._recommended_copies_for_tech(
+                cand, is_princess_aggro=is_princess_aggro, is_green_steel=is_green_steel
+            )
             test_deck = self._build_single_tech_test_deck(
                 core_card_counts=core_card_counts,
                 tech_card=cand,
@@ -391,11 +434,13 @@ class TechCardScanner:
             else:
                 best_opp = "Meta"
 
-            role_str = (
-                self._explain_princess_aggro_role(cand)
-                if is_princess_aggro
-                else self._explain_circle_of_life_role(cand)
-            )
+            if is_princess_aggro:
+                role_str = self._explain_princess_aggro_role(cand)
+            elif is_green_steel:
+                role_str = self._explain_green_steel_role(cand)
+            else:
+                role_str = self._explain_circle_of_life_role(cand)
+
             s_d1 = "+" if d_bo1 >= 0 else ""
             s_d3 = "+" if d_bo3 >= 0 else ""
             print(
@@ -429,15 +474,41 @@ class TechCardScanner:
             reverse=True,
         )
 
-        # 4. Search over candidate 16-card Flex Packages combining the top-performing tech cards
-        best_deck = best_single_deck
-        best_bo1 = best_single_bo1
-        best_bo3 = best_single_bo3
+        # 4. Search over candidate Flex Packages combining the top-performing tech cards
+        top_pool = [self.db.by_id[te.card_id] for te in tech_evals[:12]]
+        evaluated_packages: list[FlexPackageRecommendation] = []
+
+        # Always include baseline deck as candidate package #0
+        base_flex: dict[str, int] = {}
+        for cid, cnt in baseline_deck.card_counts.items():
+            base_cnt = core_card_counts.get(cid, 0)
+            if cnt > base_cnt:
+                base_flex[self.db.by_id[cid].full_name] = cnt - base_cnt
+        evaluated_packages.append(
+            FlexPackageRecommendation(
+                rank=0,
+                package_name=f"{archetype_name} (Wersja Wyjściowa / Baseline)",
+                flex_cards=base_flex,
+                expected_bo1_winrate=round(base_bo1, 4),
+                expected_bo3_winrate=round(base_bo3, 4),
+                delta_bo1_winrate=0.0,
+                delta_bo3_winrate=0.0,
+                play_winrate=round(best_single_play, 4),
+                draw_winrate=round(best_single_draw, 4),
+                uninkable_count=baseline_deck.uninkable_count,
+                average_cost=round(baseline_deck.average_cost, 2),
+                deck=baseline_deck,
+                matchup_breakdown=base_breakdown,
+                tactical_summary=self._summarize_flex_package(base_flex, archetype_name),
+            )
+        )
+
+        best_deck = baseline_deck
+        best_bo1 = base_bo1
+        best_bo3 = base_bo3
         best_play = best_single_play
         best_draw = best_single_draw
-        best_breakdown: dict[str, dict[str, float]] = dict(best_single_breakdown)
-
-        top_pool = [self.db.by_id[te.card_id] for te in tech_evals[:10]]
+        best_breakdown: dict[str, dict[str, float]] = dict(base_breakdown)
 
         for pkg_idx in range(package_candidates):
             cand_deck = self._sample_synergistic_flex_package(
@@ -450,6 +521,7 @@ class TechCardScanner:
                 inks_tag="/".join(inks),
                 allowed_inks=inks_set,
                 is_princess_aggro=is_princess_aggro,
+                is_green_steel=is_green_steel,
             )
             bo1_wr, bo3_wr, pl_wr, dr_wr, _, pkg_breakdown = self._evaluate_vs_meta_gauntlet(
                 cand_deck,
@@ -458,6 +530,8 @@ class TechCardScanner:
                 games_per_matchup=games_per_matchup,
                 seed=seed,
             )
+            pkg_d1 = bo1_wr - base_bo1
+            pkg_d3 = bo3_wr - base_bo3
             is_new_best = (bo1_wr + bo3_wr) > (best_bo1 + best_bo3)
             if is_new_best:
                 best_deck = cand_deck
@@ -466,8 +540,6 @@ class TechCardScanner:
                 best_play = pl_wr
                 best_draw = dr_wr
                 best_breakdown = pkg_breakdown
-            pkg_d1 = bo1_wr - base_bo1
-            pkg_d3 = bo3_wr - base_bo3
             ps1 = "+" if pkg_d1 >= 0 else ""
             ps3 = "+" if pkg_d3 >= 0 else ""
             star = " ★ NEW BEST!" if is_new_best else ""
@@ -476,6 +548,55 @@ class TechCardScanner:
                 f"BO3: {bo3_wr*100:5.1f}% ({ps3}{pkg_d3*100:5.1f}%){star}",
                 flush=True,
             )
+            cand_flex: dict[str, int] = {}
+            for cid, cnt in cand_deck.card_counts.items():
+                base_cnt = core_card_counts.get(cid, 0)
+                if cnt > base_cnt:
+                    cand_flex[self.db.by_id[cid].full_name] = cnt - base_cnt
+
+            evaluated_packages.append(
+                FlexPackageRecommendation(
+                    rank=0,
+                    package_name=cand_deck.name,
+                    flex_cards=cand_flex,
+                    expected_bo1_winrate=round(bo1_wr, 4),
+                    expected_bo3_winrate=round(bo3_wr, 4),
+                    delta_bo1_winrate=round(pkg_d1, 4),
+                    delta_bo3_winrate=round(pkg_d3, 4),
+                    play_winrate=round(pl_wr, 4),
+                    draw_winrate=round(dr_wr, 4),
+                    uninkable_count=cand_deck.uninkable_count,
+                    average_cost=round(cand_deck.average_cost, 2),
+                    deck=cand_deck,
+                    matchup_breakdown=pkg_breakdown,
+                    tactical_summary=self._summarize_flex_package(cand_flex, archetype_name),
+                )
+            )
+
+        # Deduplicate evaluated packages by card composition and select Top 3-5 distinct packages
+        seen_compositions: set[tuple[tuple[int, int], ...]] = set()
+        unique_packages: list[FlexPackageRecommendation] = []
+        for p in evaluated_packages:
+            comp_key = tuple(sorted(p.deck.card_counts.items()))
+            if comp_key not in seen_compositions:
+                seen_compositions.add(comp_key)
+                unique_packages.append(p)
+
+        unique_packages.sort(
+            key=lambda p: (p.expected_bo1_winrate + p.expected_bo3_winrate, p.delta_bo1_winrate),
+            reverse=True,
+        )
+        for r_idx, p in enumerate(unique_packages, 1):
+            p.rank = r_idx
+
+        top_packages = unique_packages[:5]
+        if top_packages and (top_packages[0].expected_bo1_winrate + top_packages[0].expected_bo3_winrate) > (best_bo1 + best_bo3):
+            best_deck = top_packages[0].deck
+            best_bo1 = top_packages[0].expected_bo1_winrate
+            best_bo3 = top_packages[0].expected_bo3_winrate
+            best_play = top_packages[0].play_winrate
+            best_draw = top_packages[0].draw_winrate
+            best_breakdown = top_packages[0].matchup_breakdown
 
         # Enrich best_breakdown with baseline winrates and exact percentage deltas per matchup
         for opp_name, m_info in best_breakdown.items():
@@ -507,7 +628,9 @@ class TechCardScanner:
             selected_flex_package=selected_flex,
             optimized_deck=best_deck,
             matchup_breakdown=best_breakdown,
+            top_flex_packages=top_packages,
         )
+
 
     def _evaluate_vs_meta_gauntlet(
         self,
@@ -693,10 +816,11 @@ class TechCardScanner:
         inks_tag: str,
         allowed_inks: set[str] | None = None,
         is_princess_aggro: bool = False,
+        is_green_steel: bool = False,
     ) -> Deck:
         counts = dict(core_card_counts)
         rem = flex_needed
-        valid_inks = allowed_inks or {"Amber", "Emerald"}
+        valid_inks = allowed_inks or ({"Emerald", "Steel"} if is_green_steel else {"Amber", "Emerald"})
 
         if is_princess_aggro:
             if pkg_idx == 0:
@@ -768,6 +892,83 @@ class TechCardScanner:
                 for c in shuffled:
                     qty = rng.choice([2, 3, 4]) if c.inkable else rng.choice([2, 3])
                     preferred.append((c.full_name, qty))
+        elif is_green_steel:
+            if pkg_idx == 0:
+                # 1. Wersja Wyjściowa (Maksymalna Konsystencja / Pełne 4-kopie rdzenia + 4x Flynn Rider)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 3),
+                    ("The Queen - Devious Disguise", 2),
+                    ("Mushu - Stealthy Dragon", 2),
+                    ("Angel - Experiment 624", 2),
+                    ("Woolter & Jesse - Bellwether's Henchmen", 2),
+                    ("Max Goof - Rebellious Teen", 1),
+                    ("Angela - Night Warrior", 1),
+                ]
+            elif pkg_idx == 1:
+                # 2. Pakiet Bezpośrednich Usunięć i Pingów (Smash + Look What You've Done + Flynn + Evasive)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Smash", 3),
+                    ("Look What You've Done", 3),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 3),
+                    ("Woolter & Jesse - Bellwether's Henchmen", 2),
+                    ("Angel - Experiment 624", 2),
+                ]
+            elif pkg_idx == 2:
+                # 3. Pakiet Pieśni i AoE (Malicious Mean & Scary + Strike a Good Match + Max Goof + Evasive)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Malicious, Mean, and Scary", 3),
+                    ("Strike a Good Match", 3),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 2),
+                    ("Max Goof - Rebellious Teen", 1),
+                    ("Mushu - Stealthy Dragon", 2),
+                    ("The Queen - Devious Disguise", 2),
+                ]
+            elif pkg_idx == 3:
+                # 4. Pakiet Hand Disruption i Karcenia Aggro (Sudden Chill + Cursed Merfolk + Evasive)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Sudden Chill", 3),
+                    ("Cursed Merfolk - Ursula's Handiwork", 3),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 3),
+                    ("The Queen - Devious Disguise", 2),
+                    ("Mushu - Stealthy Dragon", 2),
+                ]
+            elif pkg_idx == 4:
+                # 5. Pakiet Synergii Tod & Copper + Wytapowany Bodyguard (Inspector Tezuka)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Tod & Copper - Best of Friends", 3),
+                    ("Inspector Tezuka - Resolute Officer", 3),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 3),
+                    ("Woolter & Jesse - Bellwether's Henchmen", 2),
+                    ("Angel - Experiment 624", 2),
+                ]
+            elif pkg_idx == 5:
+                # 6. Pakiet Dual-Ink Midrange & Removal (Rapunzel & Flynn + Smash + Strike a Good Match)
+                preferred = [
+                    ("Flynn Rider - Spectral Scoundrel", 4),
+                    ("Rapunzel & Flynn Rider - Unlikely Pair", 2),
+                    ("Smash", 3),
+                    ("Strike a Good Match", 3),
+                    ("Pegasus - Gift for Hercules", 3),
+                    ("White Rabbit - Late Again", 3),
+                    ("Woolter & Jesse - Bellwether's Henchmen", 2),
+                ]
+            else:
+                preferred = []
+                shuffled = list(top_pool)
+                rng.shuffle(shuffled)
+                for c in shuffled:
+                    qty = rng.choice([2, 3, 4]) if c.inkable else rng.choice([2, 3])
+                    preferred.append((c.full_name, qty))
         else:
             # Curated competitive flex distributions for Circle of Life (pkg_idx == 0..4), then stochastic sampling
             if pkg_idx == 0:
@@ -825,7 +1026,7 @@ class TechCardScanner:
                     qty = rng.choice([2, 3, 4]) if c.inkable else rng.choice([2, 3])
                     preferred.append((c.full_name, qty))
 
-        max_unink_cap = 16 if is_princess_aggro else 11
+        max_unink_cap = 14 if is_green_steel else (16 if is_princess_aggro else 11)
         for cname, want_qty in preferred:
             if rem <= 0:
                 break
@@ -862,7 +1063,21 @@ class TechCardScanner:
         )
 
     @staticmethod
-    def _recommended_copies_for_tech(card: CardTemplate, is_princess_aggro: bool = False) -> int:
+    def _recommended_copies_for_tech(
+        card: CardTemplate, is_princess_aggro: bool = False, is_green_steel: bool = False
+    ) -> int:
+        if is_green_steel:
+            if "Flynn Rider - Spectral Scoundrel" in card.full_name:
+                return 4
+            if "Smash" in card.full_name or "Look What You've Done" in card.full_name:
+                return 3
+            if "Tod & Copper" in card.full_name:
+                return 3
+            if not card.inkable:
+                return 2
+            if card.cost >= 4:
+                return 2
+            return 3
         if is_princess_aggro:
             if "Pluto - Friendly Pooch" in card.full_name:
                 return 3
@@ -878,6 +1093,7 @@ class TechCardScanner:
         if (card.abilities.shift_cost is not None and card.cost >= 6) or card.cost >= 7:
             return 3
         return 4
+
 
     @staticmethod
     def _score_princess_aggro_synergy(card: CardTemplate, core_base_names: set[str]) -> float:
@@ -1107,6 +1323,206 @@ class TechCardScanner:
         if "Under the Sea" in txt or "Under the Sea" in name:
             return "Sing Together 8: masowo chowa na spód talii wszystkie postacie rywala o sile <=2 (świetne z 'Malicious' / debuffami)."
         return f"Wspiera krzywą kosztu ({card.cost} ink) i synergię pieśni/reanimacji w talii Amber/Emerald Circle of Life."
+
+    @staticmethod
+    def _score_green_steel_synergy(card: CardTemplate, core_base_names: set[str]) -> float:
+        name = card.full_name
+        curated_scores = {
+            "Flynn Rider - Spectral Scoundrel": 36.0,
+            "Smash": 35.0,
+            "Strike a Good Match": 34.5,
+            "Look What You've Done": 34.0,
+            "Malicious, Mean, and Scary": 33.5,
+            "Sudden Chill": 33.0,
+            "Tod & Copper - Best of Friends": 32.5,
+            "Cursed Merfolk - Ursula's Handiwork": 32.0,
+            "Inspector Tezuka - Resolute Officer": 31.0,
+            "Benja - Guardian of the Dragon Gem": 30.5,
+            "Three Arrows": 30.0,
+            "Fire the Cannons!": 29.5,
+            "Diablo - Protecting His Mistress": 29.0,
+            "Fergus - King of DunBroch": 28.5,
+            "Robin Hood - Champion of Sherwood": 28.0,
+            "Bobby Zimuruski - Spray Cheese Kid": 27.5,
+            "Donald Duck - Perfect Gentleman": 27.0,
+            "Rapunzel & Flynn Rider - Unlikely Pair": 26.5,
+            "Sir Pellinore - Tougher Than He Looks": 26.0,
+            "Pegasus - Gift for Hercules": 25.5,
+            "White Rabbit - Late Again": 25.0,
+            "The Queen - Devious Disguise": 24.5,
+            "Mushu - Stealthy Dragon": 24.0,
+            "Angel - Experiment 624": 23.5,
+            "Woolter & Jesse - Bellwether's Henchmen": 23.0,
+            "Angela - Night Warrior": 22.5,
+            "Max Goof - Rebellious Teen": 22.0,
+        }
+        if name in curated_scores:
+            return curated_scores[name]
+        score = 0.0
+        if card.card_type == "Character" and card.cost <= 3:
+            score += 9.0 + card.lore * 3.0
+            if bool(card.abilities.keywords & KeywordFlag.EVASIVE):
+                score += 5.0
+            if bool(card.abilities.keywords & KeywordFlag.BODYGUARD):
+                score += 4.5
+        if card.card_type in ("Action", "Action - Song"):
+            if "damage" in card.full_text.lower():
+                score += 8.0
+            if "draw" in card.full_text.lower() or "discard" in card.full_text.lower():
+                score += 6.0
+        if card.inkable:
+            score += 2.0
+        return score
+
+    @staticmethod
+    def _explain_green_steel_role(card: CardTemplate) -> str:
+        name = card.full_name
+        if "Flynn Rider - Spectral Scoundrel" in name:
+            return (
+                "1-drop (1/2/1, Inkable) z Boost 2: po dopłaceniu 2 ink staje się 3/2 z 2 Lore — wywiera natychmiastową "
+                "presję punktową i wymusza niekorzystne wymiany na rywalu."
+            )
+        if "Smash" in name:
+            return (
+                "Kluczowy removal (3 ink, Action, Inkable): zadaje bezwarunkowo 3 obrażenia wrogiej postaci — natychmiast "
+                "likwiduje kluczowe zagrożenia rywala (np. Ursula - Vanessa, Dale, Kuzco, Flynn) przed ich aktywacją."
+            )
+        if "Look What You've Done" in name:
+            return (
+                "Inkowalny 2-drop removal (2 ink, Action): zadaje 2 obrażenia; dodatkowo gdy zostanie odrzucony (np. przez "
+                "'Angel - Experiment 624'), możesz zagrać go natychmiast ze swojego cmentarza!"
+            )
+        if "Strike a Good Match" in name:
+            return (
+                "Inkowalna pieśń (2 ink, śpiewana za darmo przez Ursula, White Rabbit, Tod): dobiera 2 karty i odrzuca 1 — "
+                "przekopuje talię po Elinor / Strength of a Raging Fire i może być cofana przez 'Max Goof - Rebellious Teen'."
+            )
+        if "Malicious, Mean, and Scary" in name:
+            return (
+                "Inkowalna pieśń (3 ink, śpiewana przez Mushu, Angela, Vixey, Woolter): kładzie po 1 obrażeniu na każdą wrogą postać (AoE) "
+                "— czyści tokeny aggro i ułatwia dobijanie z 'Strength of a Raging Fire' lub 'Elinor'."
+            )
+        if "Sudden Chill" in name:
+            return (
+                "Inkowalna pieśń (2 ink, śpiewana za darmo): zmusza każdego przeciwnika do odrzucenia karty — w połączeniu "
+                "z 'Ursula - Deceiver' wyczerpuje zasoby przeciwnika kontrolnego (Hand Disruption)."
+            )
+        if "Tod & Copper - Best of Friends" in name:
+            return (
+                "Potężny 4-drop (3/3/2, Inkable): bezbłędna synergia z 4x 'Tod - All Alone' w rdzeniu talii — nagradza granie "
+                "Todem i daje cenne 2 punkty Lore."
+            )
+        if "Cursed Merfolk - Ursula's Handiwork" in name:
+            return (
+                "Agresywny 1-drop (0/1/2, Uninkable): wywiera szybką presję questowania, a jeśli rywal zdecyduje się go wyzwać, "
+                "musi odrzucić kartę ze swojej ręki."
+            )
+        if "Inspector Tezuka - Resolute Officer" in name:
+            return (
+                "Inkowalny 2-drop Bodyguard (2/3/1): wchodzi wytapowany, chroniąc Twoje 1-dropy (Tod, Pegasus, Flynn) "
+                "i od razu spełnia warunek 3+ wytapowanych postaci pod 'Elinor - Renowned Diplomat'."
+            )
+        if "Benja - Guardian of the Dragon Gem" in name:
+            return (
+                "Inkowalny 3-drop (2/3/2): na wejściu niszczy wybrany przedmiot rywala (Pawpsicle, Fishbone Quill, Fortisphere) "
+                "i questuje za 2 Lore."
+            )
+        if "Three Arrows" in name:
+            return (
+                "Inkowalna akcja (3 ink): zadaje 2 obrażenia wybranej postaci, a następnie 1 obrażenie innej postaci rywala (split-damage)."
+            )
+        if "Fire the Cannons!" in name:
+            return (
+                "Szybki 1-drop removal (1 ink, Uninkable): zadaje 2 obrażenia wybranej postaci — eliminuje wrogie 1-dropy w 1. turze."
+            )
+        if "Diablo - Protecting His Mistress" in name:
+            return (
+                "2-drop Evasive (3/2/1, Inkable): agresywne ciało Evasive, trudne do zlikwidowania w wyzwaniach dla talii bez Evasive."
+            )
+        if "Fergus - King of DunBroch" in name:
+            return (
+                "Inkowalny 2-drop Bodyguard (3/2/1): wchodzi wytapowany pod Elinor i ma aż 3 ataku w wyzwaniach defensywnych."
+            )
+        if "Robin Hood - Champion of Sherwood" in name:
+            return (
+                "Finisher (5 ink, Shift 3, 3/6/2, Inkable): przy wygnaniu postaci rywala dobiera kartę i generuje dodatkowe Lore."
+            )
+        if "Donald Duck - Perfect Gentleman" in name:
+            return (
+                "4-drop (2/5/2, Inkable): dobiera dodatkową kartę co turę na początku Twojej tury; 5 Willpower zapewnia wysoką przeżywalność."
+            )
+        if "Rapunzel & Flynn Rider - Unlikely Pair" in name:
+            return (
+                "Dual-Ink Emerald/Steel (5 ink, 4/4/2, Inkable): wszechstronny mid-game beater stabilizujący stół."
+            )
+        if "Sir Pellinore - Tougher Than He Looks" in name:
+            return (
+                "3-drop (1/5/1, Inkable): wysokie 5 Willpower tworzy stabilne ciało pod 'Strength of a Raging Fire'."
+            )
+        if "Pegasus - Gift for Hercules" in name:
+            return (
+                "1-drop Evasive (1/1/1, Inkable): unika wrogich wyzwań, bezpiecznie questuje i powiększa licznik postaci pod 'Strength of a Raging Fire' oraz 'Elinor'."
+            )
+        if "White Rabbit - Late Again" in name:
+            return (
+                "2-drop Evasive (2/2/1, Inkable) z Underdog: kosztuje tylko 1 ink gdy grasz na Draw w 1. turze — zapewnia bezpieczną obecność na stole od samego startu."
+            )
+        if "The Queen - Devious Disguise" in name:
+            return (
+                "4-drop (5/3/1, Inkable): dobiera kartę na wejściu, a gdy rywal ma więcej Lore od Ciebie, questuje za aż 3 Lore!"
+            )
+        if "Mushu - Stealthy Dragon" in name:
+            return (
+                "3-drop Evasive (3/2/1, Inkable): przy każdym queście dobiera kartę, jeśli rywal ma więcej kart na ręce — silny silnik wartości vs Control."
+            )
+        if "Angel - Experiment 624" in name:
+            return (
+                "4-drop (3/3/1, Inkable): raz na turę odrzuca kartę, by zadać 2 obrażenia wybranej postaci (odpalając 'Look What You've Done'!), a przy pustej ręce zyskuje Resist +2."
+            )
+        if "Woolter & Jesse - Bellwether's Henchmen" in name:
+            return (
+                "3-drop Bodyguard (4/4/1, Uninkable): ciało 4/4 z Bodyguardem i Challenger +2, które wchodzi wytapowane (idealnie pod 3+ exerted dla 'Elinor')."
+            )
+        if "Angela - Night Warrior" in name:
+            return (
+                "3-drop (2/3/1, Inkable): na wejściu daje wybranej postaci Challenger +2 i Resist +2 — umożliwia bezstratne wymiany ze stołem rywala."
+            )
+        if "Max Goof - Rebellious Teen" in name:
+            return (
+                "3-drop (2/2/1, Inkable): za 1 ink cofa z cmentarza pieśń o koszcie <=3 ('Strength of a Raging Fire', 'Malicious, Mean, and Scary', 'Strike a Good Match')."
+            )
+        return f"Wspiera krzywą ({card.cost} ink) i synergię Evasive/Removal/Elinor w talii Emerald/Steel Green Steel."
+
+    @staticmethod
+    def _summarize_flex_package(flex_cards: dict[str, int], archetype_name: str) -> str:
+        names = list(flex_cards.keys())
+        names_str = " ".join(names).lower()
+        if "princess" in archetype_name.lower():
+            if "pluto" in names_str and "nani" in names_str:
+                return "Maksymalna płynność krzywej (Pluto ramp/Elinor trigger) + dobieranie 2-dropów z Nani"
+            if "monterey jack" in names_str:
+                return "Wysoki Lore burst: Monterey Jack (3 Lore z 4+ Willpower) + ochrona Bodyguard"
+            if "percy" in names_str and "david" in names_str:
+                return "Kontrola stołu za ścianą Bodyguardów (David) + 3 Lore z Percy Pupsicle"
+            return "Agresywna rotacja 1-dropów, optymalizacja warunku Elinor (3+ exerted) i ochrona stołu"
+        if "steel" in archetype_name.lower() or "green" in archetype_name.lower():
+            if "smash" in names_str and "look what you've done" in names_str:
+                return "Kontrola stołu i pingi: bezpośredni removal Smash (3 dmg) + Look What You've Done (synergia z Angel)"
+            if "malicious" in names_str and "strike a good match" in names_str:
+                return "Silnik pieśni i AoE: Malicious (1 dmg AoE) + Strike a Good Match + rekurencja z Max Goof"
+            if "cursed merfolk" in names_str or "sudden chill" in names_str:
+                return "Hand Disruption & Aggro Punish: niszczenie ręki rywala (Cursed Merfolk, Sudden Chill, Ursula)"
+            if "tod & copper" in names_str:
+                return "Synergia Tod & Copper (z 4x Tod w rdzeniu) + wsparcie defensywne Bodyguard"
+            if "rapunzel & flynn" in names_str:
+                return "Dual-Ink Midrange: Rapunzel & Flynn Rider + Smash + Strike a Good Match"
+            if "flynn rider" in names_str and "pegasus" in names_str:
+                return "Maksymalna konsystencja krzywej i tempo Evasive (Flynn Boost + Pegasus + White Rabbit)"
+            return "Zbalansowany pakiet Evasive tempo, odpowiedzi bojowych i optymalizacji warunku Elinor"
+        if "chart topper" in names_str:
+            return "Darmowe zagrywanie pieśni z cmentarza (Chart Topper) + masowy board control"
+        return "Optymalizacja reanimacji pieśni i stabilizacja mid-game"
+
 
     @staticmethod
     def _StaticTacticalPrior(card: CardTemplate, opp_avg_cost: float) -> float:
