@@ -120,6 +120,9 @@ class ISMCTSAgent:
             return best_act, pi_vec
 
         best_act = max(legal_actions, key=lambda a: aggregated_visits.get(a, 0))
+        p_act = state.players[state.active_player]
+        if best_act.action_type == ActionType.PASS_TURN and p_act.inkwell_total == 0 and any(c.inkable for c in p_act.hand):
+            best_act = self.heuristic.select_action(state, legal_actions)
         _, slot_to_act = StateVectorizer.build_action_mask(legal_actions, action_space)
         act_to_slot = {act: sl for sl, act in slot_to_act.items()}
         for act, v_cnt in aggregated_visits.items():
@@ -197,15 +200,27 @@ class ISMCTSAgent:
         h_probs = np.exp(h_scores / 8.0)
         h_probs /= np.sum(h_probs) + 1e-8
 
+        p_act = state.players[state.active_player]
+        has_inkable = p_act.inkwell_total == 0 and any(c.inkable for c in p_act.hand)
+
         priors_arr = np.zeros(len(legal_actions), dtype=np.float32)
         for i, act in enumerate(legal_actions):
             priors_arr[i] = 0.65 * net_priors.get(act, 1.0 / len(legal_actions)) + 0.35 * h_probs[i]
+        if has_inkable:
+            for i, act in enumerate(legal_actions):
+                if act.action_type == ActionType.PASS_TURN:
+                    priors_arr[i] = 0.0
         priors_arr /= np.sum(priors_arr) + 1e-8
 
         if add_noise and len(legal_actions) > 1:
             noise = np.random.dirichlet([self.cfg.dirichlet_alpha] * len(legal_actions))
             eps = self.cfg.dirichlet_epsilon
             priors_arr = (1.0 - eps) * priors_arr + eps * noise
+            if has_inkable:
+                for i, act in enumerate(legal_actions):
+                    if act.action_type == ActionType.PASS_TURN:
+                        priors_arr[i] = 0.0
+                priors_arr /= np.sum(priors_arr) + 1e-8
 
         for i, act in enumerate(legal_actions):
             node.children[act] = MCTSNode(prior=float(priors_arr[i]))
@@ -232,4 +247,13 @@ class ISMCTSAgent:
         out: dict[GameAction, float] = {}
         for i, act in enumerate(legal_actions):
             out[act] = 0.6 * net_priors.get(act, 1.0 / len(legal_actions)) + 0.4 * float(h_probs[i])
+        p_act = state.players[state.active_player]
+        if p_act.inkwell_total == 0 and any(c.inkable for c in p_act.hand):
+            for act in list(out.keys()):
+                if act.action_type == ActionType.PASS_TURN:
+                    out[act] = 0.0
+            tot = sum(out.values())
+            if tot > 0:
+                for act in out:
+                    out[act] /= tot
         return out

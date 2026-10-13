@@ -30,46 +30,94 @@ class BoardEntity:
     temp_lore_mod: int = 0
     cards_under_count: int = 0
     boosted_this_turn: bool = False
+    temp_evasive: bool = False
+    temp_adventurous: bool = False
     shifted_under_card: CardTemplate | None = None
     shifted_under_cards: list[CardTemplate] = field(default_factory=list)
     location_instance_id: int = -1
 
     @property
     def effective_strength(self) -> int:
-        return max(0, self.card.strength + self.temp_strength_mod)
+        val = self.card.strength + self.temp_strength_mod
+        if self.cards_under_count > 0:
+            txt_lower = self.card.full_text.lower()
+            if "while there's a card under this character" in txt_lower:
+                if "+3 ¤" in txt_lower or "+3 strength" in txt_lower:
+                    val += 3
+                elif "+2 ¤" in txt_lower or "+2 strength" in txt_lower:
+                    val += 2
+                elif "+1 ¤" in txt_lower or "+1 strength" in txt_lower:
+                    val += 1
+        return max(0, val)
 
     @property
     def effective_willpower(self) -> int:
-        return max(1, self.card.willpower)
+        val = self.card.willpower
+        if self.cards_under_count > 0:
+            txt_lower = self.card.full_text.lower()
+            if "while there's a card under this character" in txt_lower:
+                if "+2 ⛉" in txt_lower or "+2 willpower" in txt_lower:
+                    val += 2
+                elif "+1 ⛉" in txt_lower or "+1 willpower" in txt_lower:
+                    val += 1
+        return max(1, val)
 
     @property
     def is_banished(self) -> bool:
         return self.damage >= self.effective_willpower
 
-    def has_keyword(self, kw: KeywordFlag) -> bool:
-        if bool(self.card.abilities.keywords & kw):
+    def effective_resist(self, owner: PlayerState | None = None) -> int:
+        base = self.card.abilities.resist_bonus
+        txt_lower = self.card.full_text.lower()
+        if self.cards_under_count > 0 and "while there's a card under this character" in txt_lower:
+            if "resist +2" in txt_lower:
+                base += 2
+            elif "resist +1" in txt_lower:
+                base += 1
+        if owner is not None:
+            if "while you have no cards in your hand, this character gains resist +2" in txt_lower and len(owner.hand) == 0:
+                base += 2
+            has_lead = any("your detective characters gain alert and resist +2" in e.card.full_text.lower() for e in owner.characters_in_play)
+            if has_lead and "Detective" in self.card.subtypes:
+                base += 2
+        return max(0, base)
+
+    def has_keyword(self, kw: KeywordFlag | str) -> bool:
+        if isinstance(kw, str):
+            try:
+                flag = KeywordFlag[kw.upper()]
+            except KeyError:
+                return False
+        else:
+            flag = kw
+
+        if flag == KeywordFlag.EVASIVE and self.temp_evasive:
             return True
-        # Ursula - Whisper of Vanessa (Set 10): "While there's a card under this character, she gets +1 ◊ and gains Evasive."
-        if (
-            kw == KeywordFlag.EVASIVE
-            and self.cards_under_count > 0
-            and "while there's a card under this character" in self.card.full_text.lower()
-            and "gains evasive" in self.card.full_text.lower()
-        ):
+        if flag == KeywordFlag.ADVENTUROUS and self.temp_adventurous:
             return True
+        if bool(self.card.abilities.keywords & flag):
+            return True
+        # Ursula - Whisper of Vanessa (Set 10)
+        if self.cards_under_count > 0 and "while there's a card under this character" in self.card.full_text.lower():
+            txt_lower = self.card.full_text.lower()
+            if flag == KeywordFlag.EVASIVE and "gains evasive" in txt_lower:
+                return True
         return False
 
     def effective_lore(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
         base = self.card.lore + self.temp_lore_mod
         txt_lower = self.card.full_text.lower()
+        # Static bonuses from cards under this character (Ursula, Flynn Rider, Megara, Kanga)
+        if self.cards_under_count > 0 and "while there's a card under this character" in txt_lower:
+            if "+2 ◊" in txt_lower or "gets +2 ◊" in txt_lower:
+                base += 2
+            elif "+1 ◊" in txt_lower or "gets +1" in txt_lower:
+                base += 1
         if owner is not None:
             if self.card.abilities.has_five_songs_lore_bonus:
                 songs_in_discard = sum(1 for c in owner.discard if c.is_song)
                 if songs_in_discard >= 5:
                     base += 3
-            # Ursula - Whisper of Vanessa (Set 10): +1 ◊ while card under
-            if self.cards_under_count > 0 and "while there's a card under this character, she gets +1" in txt_lower:
-                base += 1
             # Diablo - Stone Servant (Set 12): +2 ¤ and +1 ◊ while you have a Villain character in play
             if "while you have a villain character in play" in txt_lower:
                 if any("Villain" in e.card.subtypes for e in owner.characters_in_play):
@@ -141,6 +189,8 @@ class BoardEntity:
             temp_lore_mod=self.temp_lore_mod,
             cards_under_count=self.cards_under_count,
             boosted_this_turn=self.boosted_this_turn,
+            temp_evasive=self.temp_evasive,
+            temp_adventurous=self.temp_adventurous,
             shifted_under_card=self.shifted_under_card,
             shifted_under_cards=list(self.shifted_under_cards),
             location_instance_id=self.location_instance_id,

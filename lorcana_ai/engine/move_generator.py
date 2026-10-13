@@ -394,12 +394,12 @@ class MoveGenerator:
         )
         masks[mask_early] = "Mulligan: Fast Early Game (Keep 1-2 drops & curve)"
 
-        # Strategy 3: Balanced Curve Keep (cost <= 3, max 2 uninkables, no duplicate 3-drops)
+        # Strategy 3: Balanced Curve Keep (cost <= 3, max 1 uninkable, no duplicate 3-drops)
         unink_cnt = 0
         seen_3_ids: set[int] = set()
         mask_curve: list[bool] = []
         for c in hand:
-            if c.cost <= 3 and (c.inkable or unink_cnt < 2) and not (c.cost == 3 and c.card_id in seen_3_ids):
+            if c.cost <= 3 and (c.inkable or unink_cnt < 1) and not (c.cost == 3 and c.card_id in seen_3_ids):
                 if not c.inkable:
                     unink_cnt += 1
                 if c.cost == 3:
@@ -422,10 +422,83 @@ class MoveGenerator:
                 mask_t1.append(False)
         masks[tuple(mask_t1)] = "Mulligan: Hard Hunt for Turn-1 & Turn-2 Curve"
 
-        # Strategy 5: Full 7 Reset (throw back all 7 when hand has no early curve)
+        # Strategy 5: Matchup Anti-Aggro Defense (1-2 drops + cheap removal / bodyguards)
+        mask_anti_aggro: list[bool] = []
+        for c in hand:
+            is_defensive = (
+                (c.card_type == "Character" and c.cost <= 2)
+                or (c.cost <= 3 and bool(c.abilities.keywords & KeywordFlag.BODYGUARD))
+                or (
+                    c.cost <= 3
+                    and any(
+                        cl.op in (EffectOpType.DEAL_DAMAGE, EffectOpType.BANISH_LOW_STR_CHAR)
+                        for cl in c.abilities.clauses
+                    )
+                )
+            )
+            mask_anti_aggro.append(is_defensive and (c.inkable or unink_early < 1))
+        masks[tuple(mask_anti_aggro)] = "Mulligan: Anti-Aggro Defense (Keep cheap removal/bodyguards)"
+
+        # Strategy 6: Matchup Anti-Control / Ramp (Keep 1-2 drops + Ramp / Draw engines)
+        mask_anti_ctrl: list[bool] = []
+        kept_bomb = False
+        for c in hand:
+            is_ramp_or_draw = (
+                (c.card_type == "Character" and c.cost <= 2)
+                or (
+                    c.cost <= 3
+                    and any(
+                        cl.op in (EffectOpType.DRAW, EffectOpType.LOOT_SELF)
+                        or "into your inkwell" in c.full_text.lower()
+                        for cl in c.abilities.clauses
+                    )
+                )
+                or (c.cost in (3, 4) and c.inkable and c.lore >= 2)
+            )
+            if is_ramp_or_draw:
+                mask_anti_ctrl.append(True)
+            elif c.cost >= 6 and not kept_bomb and c.inkable:
+                kept_bomb = True
+                mask_anti_ctrl.append(True)
+            else:
+                mask_anti_ctrl.append(False)
+        masks[tuple(mask_anti_ctrl)] = "Mulligan: Anti-Control / Value (Keep ramp & draw engines)"
+
+        # Strategy 7: Singer + Song Synergistic Keep
+        singers = [c for c in hand if c.cost <= 3 and (c.abilities.singer_cost or 0) >= 3]
+        songs = [c for c in hand if c.is_song]
+        if singers and songs:
+            best_singer = min(singers, key=lambda c: c.cost)
+            max_pwr = best_singer.abilities.singer_cost or best_singer.cost
+            best_song = next((s for s in songs if s.cost <= max_pwr), None)
+            if best_song is not None:
+                mask_singer = tuple(
+                    (c.card_id == best_singer.card_id or c.card_id == best_song.card_id or (c.card_type == "Character" and c.cost <= 2))
+                    for c in hand
+                )
+                masks[mask_singer] = "Mulligan: Singer & Song Synergy Keep"
+
+        # Strategy 8: Shift Line Keep (Base character + Shift upgrade)
+        shift_cards = [c for c in hand if c.abilities.shift_cost is not None]
+        base_chars = [c for c in hand if c.card_type == "Character" and c.abilities.shift_cost is None]
+        for sc in shift_cards:
+            matching_base = next((bc for bc in base_chars if bc.base_name == sc.base_name and bc.cost < (sc.abilities.shift_cost or sc.cost)), None)
+            if matching_base is not None:
+                mask_shift = tuple(
+                    (c.card_id in (sc.card_id, matching_base.card_id) or (c.card_type == "Character" and c.cost <= 2))
+                    for c in hand
+                )
+                masks[mask_shift] = "Mulligan: Shift Line Synergy Keep"
+                break
+
+        # Strategy 9: Pitch All Uninkables (Keep inkables <= 3, pitch all uninkables)
+        mask_inkable_only = tuple(c.inkable and c.cost <= 3 for c in hand)
+        masks[mask_inkable_only] = "Mulligan: Safe Inkable Curve (Pitch all uninkables)"
+
+        # Strategy 10: Full 7 Reset (throw back all 7 when hand has no early curve)
         masks[tuple(False for _ in hand)] = "Mulligan: Full 7 Reset (Dig for 1-2 drops)"
 
-        # Strategy 6: Keep All 7
+        # Strategy 11: Keep All 7
         masks[tuple(True for _ in hand)] = "Mulligan: Keep All 7"
 
         return [

@@ -234,6 +234,225 @@ class TestEngineAndAI(unittest.TestCase):
         self.assertIn("KONIEC GRY", txt)
         self.assertIn("TURA GRY  1 (Runda 1 — Tura 1 gracza", txt)
 
+    def test_ai_always_inks_on_turn_1_even_with_lone_inkable(self) -> None:
+        """Verifies AI holding inkable cards on Turn 1 / 0 inkwell NEVER passes turn."""
+        agent = TacticalHeuristicAgent(lookahead_depth=1)
+        higgins = GLOBAL_CARD_DB.get_by_name("Higgins - Undercover Officer")  # cost 1, inkable=True
+        fangmeyer = GLOBAL_CARD_DB.get_by_name("Fangmeyer - Icy Officer")     # cost 5, inkable=False
+        raging = GLOBAL_CARD_DB.get_by_name("Raging Storm")                   # cost 8, inkable=False
+        assert higgins and fangmeyer and raging
+
+        # Construct worst-case Turn 1 brick hand: 1 lone inkable 1-drop + 6 uninkables
+        deck = [higgins] * 10 + [fangmeyer] * 30 + [raging] * 20
+        state = GameState.create_new_game(deck, deck, starting_player=0, seed=42)
+        state.phase = "MAIN"
+        p0 = state.players[0]
+        p0.hand = [fangmeyer, raging, fangmeyer, higgins, fangmeyer, fangmeyer, raging]
+        p0.inkwell_total = 0
+        p0.inkwell_available = 0
+
+        from lorcana_ai.engine.move_generator import MoveGenerator
+        legal = MoveGenerator.generate_legal_actions(state)
+        chosen = agent.select_action(state, legal)
+        self.assertEqual(chosen.action_type, ActionType.INK_CARD)
+        self.assertIn("Higgins", chosen.description)
+
+        # Also verify PASS_TURN score is strictly negative on empty inkwell
+        pass_act = next(a for a in legal if a.action_type == ActionType.PASS_TURN)
+        self.assertEqual(agent.score_action(state, pass_act), -100.0)
+
+    def test_princess_aggro_core_and_tech_cards(self) -> None:
+        """Verifies Core and Tech cards for Amber/Emerald Princess Aggro: Nani, Pluto, Elinor."""
+        nani = GLOBAL_CARD_DB.get_by_name("Nani - Stage Manager")       # Set 11, cost 3, Amber
+        pluto = GLOBAL_CARD_DB.get_by_name("Pluto - Friendly Pooch")     # Set 9, cost 1, Amber, inkable=False
+        elinor = GLOBAL_CARD_DB.get_by_name("Elinor - Renowned Diplomat") # Set 12, cost 4, Emerald, inkable=False
+        assert nani and pluto and elinor
+
+        # 1. Pluto - Friendly Pooch activated ability gives -1 character discount
+        self.assertTrue(any(cl.op == EffectOpType.DISCOUNT_NEXT_CHAR and cl.requires_exert for cl in pluto.abilities.clauses))
+
+        # 2. Nani - Stage Manager draws/reveals character with cost <= 2 from top 4 of deck
+        self.assertIn("cost 2 or less", nani.full_text.lower())
+        self.assertTrue(any(cl.op == EffectOpType.DRAW for cl in nani.abilities.clauses))
+
+        # 3. Elinor - Renowned Diplomat End of Turn trigger requires 3 exerted characters
+        self.assertTrue(any(cl.trigger == TriggerType.END_OF_TURN for cl in elinor.abilities.clauses))
+        eot_ops = {cl.op for cl in elinor.abilities.clauses if cl.trigger == TriggerType.END_OF_TURN}
+        self.assertIn(EffectOpType.DEAL_DAMAGE, eot_ops)
+        self.assertIn(EffectOpType.DRAW, eot_ops)
+        self.assertIn(EffectOpType.GAIN_LORE, eot_ops)
+
+    def test_meta_deck_mechanics_and_cards(self) -> None:
+        """Verifies newly integrated meta cards across Season 14 constructed archetypes."""
+        from lorcana_ai.data.effect_dsl import KeywordFlag
+        from lorcana_ai.engine.move_generator import GameAction
+
+        second_star = GLOBAL_CARD_DB.get_by_name("Second Star to the Right")
+        remember_me = GLOBAL_CARD_DB.get_by_name("Remember Me")
+        retro_device = GLOBAL_CARD_DB.get_by_name("Retro Evolution Device")
+        cauldron = GLOBAL_CARD_DB.get_by_name("The Black Cauldron")
+        luisa = GLOBAL_CARD_DB.get_by_name("Luisa Madrigal - Confident Climber")
+        belle = GLOBAL_CARD_DB.get_by_name("Belle - Snowfield Strategist")
+        roller_bob = GLOBAL_CARD_DB.get_by_name("Roller Bob - Sid's Toy")
+        aladdin = GLOBAL_CARD_DB.get_by_name("Aladdin - Doing His Part")
+        judy_case = GLOBAL_CARD_DB.get_by_name("Judy Hopps - On the Case")
+        nick_inq = GLOBAL_CARD_DB.get_by_name("Nick Wilde - Inquisitive Harbormaster")
+        demona = GLOBAL_CARD_DB.get_by_name("Demona - Imperious Spellcaster")
+        poca = GLOBAL_CARD_DB.get_by_name("Pocahontas - Guiding the Tribe")
+        bobby = GLOBAL_CARD_DB.get_by_name("Bobby Zimuruski - Spray Cheese Kid")
+        elinor = GLOBAL_CARD_DB.get_by_name("Elinor - Renowned Diplomat")
+        nick_det = GLOBAL_CARD_DB.get_by_name("Nick Wilde - Toy Drive Officer")
+        assert all(
+            c is not None
+            for c in (
+                second_star,
+                remember_me,
+                retro_device,
+                cauldron,
+                luisa,
+                belle,
+                roller_bob,
+                aladdin,
+                judy_case,
+                nick_inq,
+                demona,
+                poca,
+                bobby,
+                elinor,
+                nick_det,
+            )
+        )
+
+        deck = [bobby] * 60
+        state = GameState.create_new_game(deck, deck, starting_player=0, seed=55)
+        state.phase = "MAIN"
+        p0 = state.players[0]
+        p1 = state.players[1]
+        p0.board.clear()
+        p1.board.clear()
+        p0.hand.clear()
+        p1.hand.clear()
+        p0.inkwell_total = 10
+        p0.inkwell_available = 10
+
+        # 1. Second Star to the Right: draws 5 cards
+        p0.hand = [second_star]
+        p0.deck = [bobby] * 10
+        LorcanaSimulator.step(state, GameAction(ActionType.PLAY_CARD, hand_index=0, description="Play Second Star"))
+        self.assertEqual(len(p0.hand), 5)
+
+        # 2. Remember Me: plays character from discard
+        p0.discard = [elinor]
+        p0.hand = [remember_me]
+        p0.inkwell_available = 10
+        LorcanaSimulator.step(state, GameAction(ActionType.PLAY_CARD, hand_index=0, description="Play Remember Me"))
+        self.assertTrue(any(e.card.full_name == elinor.full_name for e in p0.board))
+
+        # 3. Retro Evolution Device: banishes friendly character (Bobby, cost 1) -> plays Pocahontas (cost 2 <= 1 + 2)
+        p0.board = [
+            BoardEntity(instance_id=1, card=retro_device, exerted=False, drying=False),
+            BoardEntity(instance_id=2, card=bobby, exerted=False, drying=False),
+        ]
+        p0.hand = [poca]
+        p0.discard.clear()
+        LorcanaSimulator._resolve_clauses(state, 0, retro_device, TriggerType.ACTIVATED, source_id=1)
+        self.assertTrue(any(e.card.full_name == poca.full_name for e in p0.board))
+        self.assertIn(bobby, p0.discard)
+
+        # 4. The Black Cauldron: puts character from discard under item
+        p0.discard = [elinor]
+        cauldron_ent = BoardEntity(instance_id=3, card=cauldron, exerted=False, drying=False)
+        p0.board = [cauldron_ent]
+        LorcanaSimulator._resolve_clauses(state, 0, cauldron, TriggerType.ACTIVATED, source_id=3)
+        self.assertEqual(cauldron_ent.cards_under_count, 1)
+
+        # 5. Luisa Madrigal - Confident Climber: moves damage to Luisa, then to opponent if >= 3
+        luisa_ent = BoardEntity(instance_id=4, card=luisa, exerted=False, drying=False, damage=2)
+        bobby_ent = BoardEntity(instance_id=5, card=bobby, exerted=False, drying=False, damage=1)
+        opp_ent = BoardEntity(instance_id=6, card=elinor, exerted=False, drying=False, damage=0)
+        p0.board = [luisa_ent, bobby_ent]
+        p1.board = [opp_ent]
+        LorcanaSimulator._resolve_clauses(state, 0, luisa, TriggerType.ACTIVATED, source_id=4)
+        self.assertEqual(bobby_ent.damage, 0)
+        self.assertEqual(luisa_ent.damage, 0)
+        self.assertEqual(opp_ent.damage, 3)
+
+        # 6. Belle - Snowfield Strategist: when allied character is banished, puts card into inkwell
+        belle_ent = BoardEntity(instance_id=7, card=belle, exerted=False, drying=False)
+        sac_ent = BoardEntity(instance_id=8, card=bobby, exerted=False, drying=False, damage=bobby.willpower)
+        p0.board = [belle_ent, sac_ent]
+        ink_before = p0.inkwell_total
+        LorcanaSimulator._cleanup_banished(state)
+        self.assertEqual(p0.inkwell_total, ink_before + 1)
+        self.assertIn(bobby, p0.inkwell_cards)
+
+        # 7. Roller Bob - Sid's Toy: puts 2 characters from discard to deck bottom to gain Rush
+        p0.discard = [bobby, poca]
+        rb_ent = BoardEntity(instance_id=9, card=roller_bob, exerted=False, drying=True)
+        p0.board = [rb_ent]
+        LorcanaSimulator._resolve_clauses(state, 0, roller_bob, TriggerType.ON_PLAY, source_id=9)
+        self.assertFalse(rb_ent.drying)
+
+        # 8. Aladdin - Doing His Part: pays 1 ink to banish opponent's item
+        p0.inkwell_available = 2
+        p1.board = [BoardEntity(instance_id=10, card=retro_device, exerted=False, drying=False)]
+        LorcanaSimulator._resolve_clauses(state, 0, aladdin, TriggerType.ON_PLAY, source_id=11)
+        self.assertEqual(len(p1.board), 0)
+        self.assertIn(retro_device, p1.discard)
+
+        # 9. Judy Hopps - On the Case: Detective ally present -> ramps opp item into opp inkwell
+        p0.board = [
+            BoardEntity(instance_id=12, card=nick_det, exerted=False, drying=False),
+            BoardEntity(instance_id=13, card=judy_case, exerted=False, drying=False),
+        ]
+        p1.board = [BoardEntity(instance_id=14, card=retro_device, exerted=False, drying=False)]
+        p1_ink_before = p1.inkwell_total
+        LorcanaSimulator._resolve_clauses(state, 0, judy_case, TriggerType.ON_PLAY, source_id=13)
+        self.assertEqual(len(p1.board), 0)
+        self.assertEqual(p1.inkwell_total, p1_ink_before + 1)
+
+        # 10. Nick Wilde - Inquisitive Harbormaster: gives Adventurous
+        p1.board = [BoardEntity(instance_id=15, card=bobby, exerted=False, drying=False)]
+        LorcanaSimulator._resolve_clauses(state, 0, nick_inq, TriggerType.ON_QUEST, source_id=16)
+        self.assertTrue(p1.board[0].has_keyword(KeywordFlag.ADVENTUROUS))
+
+        # 11. Demona - Imperious Spellcaster: gives Gargoyle Rush and Evasive
+        p0.hand = [bobby]
+        demona_ent = BoardEntity(instance_id=17, card=demona, exerted=False, drying=True)
+        p0.board = [demona_ent]
+        LorcanaSimulator._resolve_clauses(state, 0, demona, TriggerType.ACTIVATED, source_id=17)
+        self.assertTrue(demona_ent.has_keyword(KeywordFlag.EVASIVE))
+        self.assertFalse(demona_ent.drying)
+
+    def test_matchup_aware_mulligan_strategy(self) -> None:
+        """Verifies matchup-aware, on-the-play vs on-the-draw, and uninkable-safe mulligan selection."""
+        bobby = GLOBAL_CARD_DB.get_by_name("Bobby Zimuruski - Spray Cheese Kid")  # cost 1, inkable
+        poca = GLOBAL_CARD_DB.get_by_name("Pocahontas - Guiding the Tribe")       # cost 2, inkable
+        elinor = GLOBAL_CARD_DB.get_by_name("Elinor - Renowned Diplomat")         # cost 4, uninkable
+        raging = GLOBAL_CARD_DB.get_by_name("Raging Storm")                       # cost 8, uninkable
+        assert bobby and poca and elinor and raging
+
+        deck = [bobby] * 20 + [poca] * 20 + [elinor] * 10 + [raging] * 10
+        state = GameState.create_new_game(deck, deck, starting_player=0, seed=1)
+        p0 = state.players[0]
+        agent = TacticalHeuristicAgent(lookahead_depth=1)
+
+        # 1. Hand with good 1-drop + 2-drop but 5 uninkables: must pitch all 5 uninkables and keep Bobby + Pocahontas
+        p0.hand = [bobby, poca, elinor, raging, raging, raging, raging]
+        best_act = agent.select_action(state)
+        self.assertEqual(best_act.action_type, ActionType.MULLIGAN)
+        # Verify kept cards are only Bobby and Pocahontas
+        self.assertTrue(best_act.mulligan_keep_mask[0])
+        self.assertTrue(best_act.mulligan_keep_mask[1])
+        self.assertFalse(best_act.mulligan_keep_mask[2])
+        self.assertFalse(best_act.mulligan_keep_mask[3])
+
+        # 2. Hand with 0 early drops and 7 uninkables: must perform Full 7 Reset
+        p0.hand = [elinor, elinor, raging, raging, raging, raging, raging]
+        best_brick = agent.select_action(state)
+        self.assertEqual(best_brick.action_type, ActionType.MULLIGAN)
+        self.assertEqual(sum(best_brick.mulligan_keep_mask), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

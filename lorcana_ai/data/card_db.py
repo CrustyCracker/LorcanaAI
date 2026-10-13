@@ -87,6 +87,8 @@ class CardTemplate:
             return target_card.card_type == "Item" and target_card.base_name.lower() == "potato"
         if target_card.card_type != "Character":
             return False
+        if target_card.abilities.is_universal_shift or target_card.base_name == "Morph":
+            return True
         if self.abilities.is_universal_shift:
             return True
         if self.abilities.shift_classification:

@@ -179,9 +179,11 @@ class TacticalHeuristicAgent:
             loc.card.lore * 3.5 + max(1, loc.effective_willpower - loc.damage) for loc in opp.locations_in_play
         )
 
-        # 3. Hand & Inkwell resources
-        hand_val = (len(p.hand) - len(opp.hand)) * 3.2
-        ink_val = (min(7, p.inkwell_total) - min(7, opp.inkwell_total)) * 1.8
+        # 3. Hand & Inkwell resources (In early turns 1-3, having ink to curve out is strictly higher value than holding 1 extra card)
+        hand_val = (len(p.hand) - len(opp.hand)) * 2.8
+        ink_factor = 3.8 if p.inkwell_total < 4 else (2.2 if p.inkwell_total < 7 else 0.8)
+        opp_ink_factor = 3.8 if opp.inkwell_total < 4 else (2.2 if opp.inkwell_total < 7 else 0.8)
+        ink_val = min(7, p.inkwell_total) * ink_factor - min(7, opp.inkwell_total) * opp_ink_factor
 
         return lore_diff + (my_board_val - opp_board_val) + hand_val + ink_val
 
@@ -190,7 +192,7 @@ class TacticalHeuristicAgent:
         p = state.players[p_id]
         opp = state.players[1 - p_id]
 
-        # 1. Mulligan evaluation
+        # 1. Mulligan evaluation (CR Rule 2.2.4 & Matchup-Aware Tournament Logic)
         if action.action_type == ActionType.MULLIGAN:
             mask = action.mulligan_keep_mask
             kept_cards = [p.hand[i] for i, k in enumerate(mask) if i < len(p.hand) and k]
@@ -200,45 +202,230 @@ class TacticalHeuristicAgent:
             two_drops = sum(1 for c in kept_cards if c.cost == 2 and c.card_type == "Character")
             early_drops = one_drops + two_drops
             three_drops = sum(1 for c in kept_cards if c.cost == 3 and c.card_type == "Character")
-            singers = sum(1 for c in kept_cards if c.cost <= 2 and (c.abilities.singer_cost or 0) >= 3)
-            underdogs = sum(1 for c in kept_cards if c.abilities.has_underdog)
-            looters = sum(
-                1 for c in kept_cards
-                if c.cost <= 3 and any(cl.op == EffectOpType.LOOT_SELF for cl in c.abilities.clauses)
-            )
-            heavy_bombs = sum(1 for c in kept_cards if c.cost >= 7)
-            score = (
-                early_drops * 4.5
-                + (6.0 if (one_drops >= 1 and two_drops >= 1) else 0.0)
-                + singers * 2.5
-                + underdogs * 2.0
-                + min(2, three_drops) * 2.5
-                + min(2, looters) * 3.0
-                - max(0, uninkables - 2) * 5.0
-            )
-            # CRITICAL: Never keep a slow hand with 0 Turn-1/Turn-2 characters! Reward throwing back cards to dig for 1-2 drops!
-            if early_drops == 0:
-                score -= 28.0 - returned_cnt * 4.5
-            if heavy_bombs > 0:
-                if looters > 0 and heavy_bombs == 1:
-                    score += 2.0
+            four_drops = sum(1 for c in kept_cards if c.cost == 4 and c.card_type == "Character")
+            heavy_bombs = sum(1 for c in kept_cards if c.cost >= 6)
+
+            # Matchup & Turn Initiative Context
+            is_on_the_play = (state.active_player == state.starting_player)
+            opp_inks = set(state.known_opponent_inks[p_id])
+
+            # Detect player's own deck archetype from deck + hand
+            all_known_deck = p.deck + p.hand
+            deck_chars = [c for c in all_known_deck if c.card_type == "Character"]
+            avg_deck_cost = (sum(c.cost for c in all_known_deck) / len(all_known_deck)) if all_known_deck else 3.5
+            is_aggro_deck = (avg_deck_cost < 3.2) or (sum(1 for c in deck_chars if c.cost <= 2) >= 16)
+
+            score = 0.0
+
+            # 1. Early Curve Foundation
+            score += one_drops * 5.0
+            score += two_drops * 4.5
+            if one_drops >= 1 and two_drops >= 1:
+                score += 7.0  # Gold standard: guaranteed T1 into T2 curve
+                if three_drops >= 1:
+                    score += 4.5  # Platinum standard: perfect 1 -> 2 -> 3 curve
+            elif early_drops == 0:
+                # Fatal flaw: no 1-drop and no 2-drop character -> reward throwing cards back to dig!
+                score -= 32.0 - (returned_cnt * 5.0)
+
+            # 2. Play vs Draw Dynamics
+            if is_on_the_play:
+                # On the play: skips draw step on T1; having a 1-drop is mandatory to hold tempo
+                if one_drops >= 1:
+                    score += 6.0
                 else:
-                    score -= heavy_bombs * 4.5
-            opp_inks = state.known_opponent_inks[p_id]
-            if "Emerald" in opp_inks or "Amber" in opp_inks:
-                removal_cnt = sum(
+                    score -= 8.0  # Harsh penalty for no 1-drop on the play
+            else:
+                # On the draw: draws on T1; Underdog cards trigger in T1
+                underdogs = sum(1 for c in kept_cards if c.abilities.has_underdog)
+                score += underdogs * 4.0
+                # Cheap challengers / rush help contest opponent's T1 tempo opening
+                cheap_challengers = sum(
                     1 for c in kept_cards
-                    if c.cost <= 4 and any(
+                    if c.cost <= 2 and (
+                        (c.abilities.challenger_bonus or 0) >= 2
+                        or bool(c.abilities.keywords & KeywordFlag.RUSH)
+                    )
+                )
+                score += cheap_challengers * 3.5
+
+            # 3. Archetype Alignment
+            if is_aggro_deck:
+                # Aggro must NEVER keep 4+ cost cards unless it already has 1-drop AND 2-drop
+                if one_drops == 0 or two_drops == 0:
+                    score -= (four_drops * 6.0 + heavy_bombs * 10.0)
+                else:
+                    score -= max(0, four_drops - 1) * 5.0
+                # Swarming with multiple 1-drops is advantageous for aggro
+                if one_drops >= 2:
+                    score += 4.0
+            else:
+                # Midrange/Control rewards ramp (e.g. One Jump Ahead, Gramma Tala)
+                ramp_cards = sum(
+                    1 for c in kept_cards
+                    if c.cost <= 3 and (
+                        "into your inkwell" in c.full_text.lower()
+                        or "one jump ahead" in c.full_name.lower()
+                    )
+                )
+                score += ramp_cards * 5.0
+
+            # Elinor - Renowned Diplomat tournament heuristics (JDRR Guide):
+            has_elinor_in_kept = any("elinor - renowned diplomat" in c.full_name.lower() for c in kept_cards)
+            has_ramp_or_discount = any(
+                (c.cost <= 2 and any(cl.op == EffectOpType.DISCOUNT_NEXT_CHAR for cl in c.abilities.clauses))
+                or "aurora - holding court" in c.full_name.lower()
+                or "one jump ahead" in c.full_name.lower()
+                or "gramma tala" in c.full_name.lower()
+                or "sail the astral seas" in c.full_name.lower()
+                for c in kept_cards
+            )
+            if has_elinor_in_kept:
+                if is_on_the_play:
+                    # OTP: Keep Elinor blind if we have ramp characters! She snowballs uncounterably on T3
+                    if has_ramp_or_discount and early_drops >= 1:
+                        score += 12.0
+                    elif one_drops >= 1 and two_drops >= 1:
+                        score += 6.5
+                    else:
+                        score -= 5.0
+                else:
+                    # OTD: "I don't like keeping Elinor OTD because a lot of the time you can't play her and she's just stuck in hand"
+                    if not (has_ramp_or_discount and early_drops >= 2):
+                        score -= 7.5
+                    else:
+                        score += 3.0
+
+            # Princess Aggro On The Draw (OTD) interaction keeps: Ursula 2c & Dale
+            if not is_on_the_play and is_aggro_deck:
+                has_ursula_2c = any(c.cost == 2 and "ursula - deceiver" in c.full_name.lower() for c in kept_cards)
+                has_dale = any("dale - ready for his shot" in c.full_name.lower() for c in kept_cards)
+                if has_ursula_2c and (early_drops >= 1 or has_ramp_or_discount):
+                    score += 8.5  # Song disruption stops blowouts
+                if has_dale and (early_drops >= 1 or has_ramp_or_discount):
+                    score += 8.0  # Counter-trades and threat equalizing
+
+            # Purple Steel Droids combo assembly (JDRR Guide):
+            is_droid_deck = any("omnidroid" in c.full_name.lower() or "syndrome" in c.full_name.lower() for c in all_known_deck)
+            if is_droid_deck:
+                droid_1c = sum(1 for c in kept_cards if c.cost == 1 and "omnidroid" in c.full_name.lower())
+                shift_target_2c = sum(1 for c in kept_cards if c.cost == 2 and ("morph" in c.full_name.lower() or "incrediboy" in c.full_name.lower()))
+                syndrome_shift = sum(1 for c in kept_cards if "syndrome - out for revenge" in c.full_name.lower())
+                big_droid = sum(1 for c in kept_cards if c.cost >= 6 and "omnidroid" in c.full_name.lower())
+                if shift_target_2c >= 1 and syndrome_shift >= 1:
+                    score += 14.0
+                    if big_droid >= 1:
+                        score += 12.0  # Full Turn 4 combo blowout
+                    if droid_1c >= 1:
+                        score += 4.5
+                elif syndrome_shift >= 1 and big_droid >= 1:
+                    score += 6.0
+                if not is_on_the_play:
+                    defensive_pings = sum(
+                        1 for c in kept_cards
+                        if "look what you've done" in c.full_name.lower()
+                        or "angel - experiment 624" in c.full_name.lower()
+                        or ("omnidroid - v.9" in c.full_name.lower() and c.cost == 4)
+                    )
+                    score += defensive_pings * 6.5
+                else:
+                    if any("omnidroid - v.9" in c.full_name.lower() for c in kept_cards) and shift_target_2c == 0:
+                        score -= 4.0
+
+            # 4. Matchup Specifics (opp_inks)
+            is_opp_aggro = ("Amber" in opp_inks and "Emerald" in opp_inks) or ("Amber" in opp_inks and "Amethyst" in opp_inks)
+            is_opp_control = ("Ruby" in opp_inks and "Sapphire" in opp_inks) or ("Ruby" in opp_inks and "Amethyst" in opp_inks)
+            is_opp_steel = "Steel" in opp_inks
+            is_opp_discard = "Emerald" in opp_inks and "Steel" in opp_inks
+
+            if is_opp_aggro:
+                # Against Aggro: prioritize early removal, Bodyguards, and sturdy blockers
+                early_removal = sum(
+                    1 for c in kept_cards
+                    if c.cost <= 3 and any(
                         cl.op in (
                             EffectOpType.DEAL_DAMAGE,
                             EffectOpType.DEAL_DAMAGE_ALL_OPP,
-                            EffectOpType.DEAL_DAMAGE_ALL_DAMAGED_OPP,
                             EffectOpType.BANISH_LOW_STR_CHAR,
                         )
                         for cl in c.abilities.clauses
                     )
                 )
-                score += removal_cnt * 3.0
+                bodyguards = sum(1 for c in kept_cards if c.cost <= 3 and bool(c.abilities.keywords & KeywordFlag.BODYGUARD))
+                score += (early_removal * 4.5 + bodyguards * 3.5)
+                score -= sum(1 for c in kept_cards if c.cost >= 5) * 6.0
+
+            elif is_opp_control:
+                # Against Control: prioritize card draw engines and recurring value
+                draw_engines = sum(
+                    1 for c in kept_cards
+                    if any(cl.op == EffectOpType.DRAW for cl in c.abilities.clauses)
+                )
+                score += draw_engines * 4.0
+                dead_removals = sum(
+                    1 for c in kept_cards
+                    if c.card_type == "Action" and not c.inkable and any(
+                        cl.op in (EffectOpType.DEAL_DAMAGE, EffectOpType.BANISH_LOW_STR_CHAR)
+                        for cl in c.abilities.clauses
+                    )
+                )
+                score -= dead_removals * 5.0
+
+            if is_opp_steel:
+                # Against Steel: avoid fragile 1-willpower characters that die to 1-damage pings, keep 4 WP Thomas
+                fragile_1_wp = sum(1 for c in kept_cards if c.card_type == "Character" and c.cost <= 2 and c.willpower <= 1)
+                score -= fragile_1_wp * 3.5
+                sturdy_2plus_wp = sum(1 for c in kept_cards if c.card_type == "Character" and c.cost <= 2 and c.willpower >= 2)
+                score += sturdy_2plus_wp * 2.5
+                thomas_cnt = sum(1 for c in kept_cards if "thomas - wide-eyed recruit" in c.full_name.lower())
+                score += thomas_cnt * 4.0
+
+            if is_opp_discard:
+                # Against Discard: prioritize inkables and immediate cantrips
+                score -= uninkables * 3.0
+                cantrips = sum(
+                    1 for c in kept_cards
+                    if c.cost <= 3 and any(cl.op == EffectOpType.DRAW for cl in c.abilities.clauses)
+                )
+                score += cantrips * 4.0
+
+            # 5. Synergies: Singer + Song & Shift Lines
+            singers = [c for c in kept_cards if c.cost <= 3 and (c.abilities.singer_cost or 0) >= 3]
+            songs = [c for c in kept_cards if c.is_song]
+            for s in singers:
+                singer_pwr = s.abilities.singer_cost or s.cost
+                if any(song.cost <= singer_pwr for song in songs):
+                    score += 5.0
+                    break
+
+            base_names = {c.base_name for c in kept_cards if c.abilities.shift_cost is None}
+            shift_cards = [c for c in kept_cards if c.abilities.shift_cost is not None]
+            for sc in shift_cards:
+                if sc.base_name in base_names:
+                    score += 4.0
+                    break
+
+            # 6. Penalties: Uninkables & Redundant Duplicates
+            if uninkables == 0:
+                score += 2.0
+            elif uninkables > 2:
+                score -= (uninkables - 2) * 8.0
+
+            seen_cost_3plus: set[int] = set()
+            for c in kept_cards:
+                if c.cost >= 3:
+                    if c.card_id in seen_cost_3plus:
+                        score -= 5.0  # Redundant duplicate penalty
+                    else:
+                        seen_cost_3plus.add(c.card_id)
+
+            if heavy_bombs > 0:
+                looters = sum(1 for c in kept_cards if c.cost <= 3 and any(cl.op == EffectOpType.LOOT_SELF for cl in c.abilities.clauses))
+                if looters > 0 and heavy_bombs == 1:
+                    score += 1.0
+                else:
+                    score -= heavy_bombs * 6.0
+
             return score
 
         # Precompute race, lethal math, and revealed opponent hand knowledge for all MAIN phase actions
@@ -290,16 +477,23 @@ class TacticalHeuristicAgent:
 
             card = p.hand[action.hand_index]
             dup_count = sum(1 for c in p.hand if c.card_id == card.card_id)
+            inkable_count = sum(1 for c in p.hand if c.inkable)
             score = 36.0 if p.inkwell_total < 6 else (28.0 if len(p.hand) >= 3 else 8.0)
 
-            # CRITICAL Turn 1-3 protection: if inking `card` leaves us with ZERO playable cards this turn, heavily penalize inking it!
+            # Turn 1 / Empty Inkwell: Inking is mandatory to unlock playing cards!
+            # Give massive unconditional bonus (+30.0) so inking on Turn 1 always dominates PASS_TURN
+            if p.inkwell_total == 0:
+                score += 30.0
+
+            # Midgame curve management (Turns 2-3 with already >= 2 ink):
+            # If inking leaves us with 0 playable cards this turn, penalize inking, BUT only when we ALREADY have ink!
             new_ink_after = p.total_payable_ink + 1
             rem_playable_after_ink = sum(
                 1 for i, c in enumerate(p.hand)
                 if i != action.hand_index and _eff_needed_ink(c) <= new_ink_after
             )
-            if p.inkwell_total <= 2 and rem_playable_after_ink == 0:
-                score -= 22.0
+            if 2 <= p.inkwell_total <= 3 and rem_playable_after_ink == 0:
+                score -= 15.0
 
             if dup_count > 1:
                 score += 4.5
@@ -349,19 +543,19 @@ class TacticalHeuristicAgent:
             # Protect Pocahontas - Guiding the Tribe on Turns 1-2 if we have a 1-drop in hand
             if any(cl.op == EffectOpType.PLAY_COST1_CHAR_FREE for cl in card.abilities.clauses) and dup_count == 1:
                 score -= 10.0
-            # Protect 2-drop Characters in the first two turns if it's our only 2-drop
+            # Protect 2-drop Characters in the first two turns if it's our only 2-drop (unless it's our only inkable card!)
             two_drop_chars = sum(1 for c in p.hand if c.cost <= 2 and c.card_type == "Character")
-            if card.cost <= 2 and card.card_type == "Character" and p.inkwell_total < 2 and two_drop_chars <= 1:
+            if card.cost <= 2 and card.card_type == "Character" and p.inkwell_total < 2 and two_drop_chars <= 1 and inkable_count > 1:
                 score -= 10.0
-            # Protect 1-drop Characters on Turn 1 if it's our only 1-drop
+            # Protect 1-drop Characters on Turn 1 if it's our only 1-drop (unless it's our only inkable card!)
             one_drop_chars = sum(1 for c in p.hand if c.cost == 1 and c.card_type == "Character")
-            if card.cost == 1 and card.card_type == "Character" and p.inkwell_total == 0 and one_drop_chars <= 1:
-                score -= 12.0
-            # Protect on-curve character for THIS turn (cost == p.inkwell_total + 1) if we only have 1 copy
+            if card.cost == 1 and card.card_type == "Character" and p.inkwell_total == 0 and one_drop_chars <= 1 and inkable_count > 1:
+                score -= 10.0
+            # Protect on-curve character for THIS turn (cost == p.inkwell_total + 1) if we only have 1 copy (unless it's our only inkable card)
             on_curve_cost = p.inkwell_total + 1
             on_curve_chars = sum(1 for c in p.hand if c.cost == on_curve_cost and c.card_type == "Character")
-            if card.cost == on_curve_cost and card.card_type == "Character" and on_curve_chars <= 1:
-                score -= 6.0
+            if card.cost == on_curve_cost and card.card_type == "Character" and on_curve_chars <= 1 and inkable_count > 1:
+                score -= 5.0
             # If we have a looter (Strike a Good Match / Tod) in hand, hold onto 1 heavy Character (Prince Phillip) to pitch to discard!
             has_looter_in_hand = any(
                 any(cl.op == EffectOpType.LOOT_SELF for cl in h.abilities.clauses)
@@ -474,6 +668,18 @@ class TacticalHeuristicAgent:
                 # Pocahontas - Peacekeeper Shift: fogs all challenges until next turn!
                 if not p.challenged_this_turn and len(opp.characters_in_play) >= 1 and len(p.characters_in_play) >= 2:
                     bonus += 16.0
+            # Syndrome - Out for Revenge Shift (JDRR Guide): Turn 4 combo enabler
+            if "syndrome" in card.full_name.lower():
+                has_robot = any("Robot" in c.subtypes or "omnidroid" in c.full_name.lower() for c in p.discard + p.hand)
+                if has_robot:
+                    bonus += 18.0
+            # Omnidroid - V.9 Shift (deals 2 damage on shift to snipe key early character)
+            if any(cl.op == EffectOpType.DEAL_DAMAGE and cl.amount == 2 for cl in card.abilities.clauses):
+                snipeable = [e for e in opp.characters_in_play if e.effective_willpower - e.damage <= 2]
+                if snipeable:
+                    bonus += 15.0
+                    if any(any(k in e.card.full_name.lower() for k in ["willow", "pluto", "morph", "aurora"]) for e in snipeable):
+                        bonus += 7.0
             return 25.0 + card.cost * 2.0 + card.lore * 2.0 + bonus
 
         # 5. Play Card
@@ -623,7 +829,8 @@ class TacticalHeuristicAgent:
                 + attacker.card.abilities.challenger_bonus
                 + attacker.temp_challenger_mod
             )
-            dmg_to_def = max(0, atk_pwr - defender.card.abilities.resist_bonus)
+            def_resist = defender.effective_resist(opp)
+            dmg_to_def = max(0, atk_pwr - def_resist)
             if dmg_to_def <= 0:
                 return -50.0
             base_def = (
@@ -631,13 +838,7 @@ class TacticalHeuristicAgent:
                 if defender.card.card_type == "Location"
                 else (defender.effective_willpower if opp_uses_wp else defender.effective_strength)
             )
-            has_lead_detective = any(
-                "your detective characters gain alert and resist +2" in e.card.full_text.lower()
-                for e in p.characters_in_play
-            )
-            atk_resist = attacker.card.abilities.resist_bonus + (
-                2 if (has_lead_detective and "Detective" in attacker.card.subtypes) else 0
-            )
+            atk_resist = attacker.effective_resist(p)
             dmg_to_atk = (
                 0
                 if defender.card.card_type == "Location"
@@ -658,7 +859,7 @@ class TacticalHeuristicAgent:
                             continue
                         ally_base = ally.effective_willpower if p_uses_wp else ally.effective_strength
                         ally_pwr = ally_base + ally.card.abilities.challenger_bonus + ally.temp_challenger_mod
-                        other_allies_dmg += max(0, ally_pwr - defender.card.abilities.resist_bonus)
+                        other_allies_dmg += max(0, ally_pwr - def_resist)
             can_team_kill = (not kills_def) and ((dmg_to_def + other_allies_dmg) >= def_rem_wp)
 
             opp_board_lore = sum(e.effective_lore(opp, p) for e in opp.characters_in_play)
@@ -717,6 +918,13 @@ class TacticalHeuristicAgent:
                     score += 10.5 + def_lore * 2.0
                 else:
                     score -= 6.0
+
+            # Elinor - Renowned Diplomat synergy: if we have Elinor in play and 2 exerted characters, attacking with a 3rd exerts it and triggers Elinor at end of turn!
+            has_elinor = any("3 or more exerted characters" in e.card.full_text.lower() for e in p.characters_in_play)
+            exerted_cnt = sum(1 for e in p.characters_in_play if e.exerted)
+            if has_elinor and exerted_cnt == 2:
+                score += 6.5
+
             return score
 
         if action.action_type == ActionType.QUEST:
@@ -777,6 +985,19 @@ class TacticalHeuristicAgent:
             if has_elinor and exerted_cnt == 2:
                 bonus += 6.5
 
+            # Pocahontas Fog: if opponent cannot challenge, all ready characters can quest with 100% safety
+            if opp.cant_challenge_this_turn:
+                bonus += 14.0
+
+            # Dale trap-trades: if Dale is on board, 4 WP characters hit for 4 in counter-trades
+            has_dale = any(e.card.abilities.deals_willpower_damage_in_challenges for e in p.characters_in_play)
+            if has_dale and quester.effective_willpower >= 4:
+                bonus += 4.5
+
+            # Syndrome - Out for Revenge: questing returns robot from discard and plays robot <= 8 for free!
+            if "syndrome" in quester.card.full_name.lower() and any(cl.trigger == TriggerType.ON_QUEST for cl in quester.card.abilities.clauses):
+                bonus += 16.0
+
             # Mickey Mouse - Best in Town: gains +1 lore at end of turn only if exerted!
             if "if this character is exerted" in quester.card.full_text.lower():
                 bonus += 5.0
@@ -800,7 +1021,27 @@ class TacticalHeuristicAgent:
                         any(0 < cost - cl.amount <= p.total_payable_ink for cost in char_costs)
                         and sum(char_costs) > p.total_payable_ink
                     )
-                    return 34.5 if needs_discount else -20.0
+                    if not needs_discount:
+                        return -20.0
+                    score = 34.5
+                    # JDRR Guideline on Pluto / Fragile ramp:
+                    # If exerting Pluto exposes him to a free kill from an opposing 1-drop/attacker,
+                    # and we don't have a Bodyguard (David) in play or entering to protect him, avoid exerting!
+                    if cl.requires_exert and ent.effective_willpower <= 2:
+                        has_bodyguard_shield = any(
+                            bool(b.card.abilities.keywords & KeywordFlag.BODYGUARD) and b.exerted
+                            for b in p.characters_in_play
+                        ) or any(
+                            bool(c.abilities.keywords & KeywordFlag.BODYGUARD)
+                            for c in p.hand if p.effective_play_cost(c) <= p.total_payable_ink
+                        )
+                        opp_threatens_kill = any(
+                            (e.effective_strength >= ent.effective_willpower - ent.damage)
+                            for e in opp.characters_in_play
+                        )
+                        if opp_threatens_kill and not has_bodyguard_shield:
+                            score -= 18.0
+                    return score
                 if cl.op == EffectOpType.GAIN_LORE:
                     return 32.0
                 if cl.op == EffectOpType.RAMP_INK:
@@ -809,9 +1050,25 @@ class TacticalHeuristicAgent:
                     return -15.0
                 if cl.op == EffectOpType.DEBUFF_OPP_STR:
                     return 16.0 if len(opp.characters_in_play) > 0 else -10.0
+                if cl.op == EffectOpType.RETRO_EVOLVE:
+                    # Retro Evolution Device: banish a character to play a bigger character for free!
+                    max_c = max((e.card.cost for e in p.characters_in_play), default=0) + 2
+                    has_target = any(c.card_type == "Character" and c.cost <= max_c and c.cost >= 3 for c in p.hand)
+                    return 28.5 if has_target else -20.0
+                if cl.op == EffectOpType.PUT_UNDER_FROM_DISCARD:
+                    # The Black Cauldron: put character from discard under cauldron
+                    return 20.0 if any(c.card_type == "Character" for c in p.discard) else -20.0
+                if cl.op == EffectOpType.MOVE_DAMAGE:
+                    # Luisa Madrigal: move damage
+                    return 18.0 if any(e.damage > 0 for e in p.characters_in_play if e != ent) else -10.0
+                if cl.op == EffectOpType.GIVE_RUSH_EVASIVE:
+                    # Demona: give gargoyle rush/evasive
+                    return 22.0 if len(p.hand) >= 2 and any("Gargoyle" in e.card.subtypes for e in p.characters_in_play) else -15.0
             return 11.0
 
         if action.action_type == ActionType.PASS_TURN:
+            if p.inkwell_total == 0 and any(c.inkable for c in p.hand):
+                return -100.0  # Mandatory Lorcana rule: never pass turn 1 with 0 ink when holding inkable cards!
             return 0.0
 
         return 0.0

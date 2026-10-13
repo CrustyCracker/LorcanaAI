@@ -87,6 +87,14 @@ class EffectOpType(str, Enum):
     DISCOUNT_NEXT_PRINCESS_QUEEN = "DISCOUNT_NEXT_PRINCESS_QUEEN"
     EXERT_OPP_CHAR = "EXERT_OPP_CHAR"
     INK_OPP_CHAR = "INK_OPP_CHAR"
+    RETRO_EVOLVE = "RETRO_EVOLVE"
+    PUT_UNDER_FROM_DISCARD = "PUT_UNDER_FROM_DISCARD"
+    GIVE_SELF_RUSH = "GIVE_SELF_RUSH"
+    MOVE_DAMAGE = "MOVE_DAMAGE"
+    INK_ITEM = "INK_ITEM"
+    BANISH_ITEM = "BANISH_ITEM"
+    GIVE_ADVENTUROUS = "GIVE_ADVENTUROUS"
+    GIVE_RUSH_EVASIVE = "GIVE_RUSH_EVASIVE"
 
 
 @dataclass(frozen=True)
@@ -173,7 +181,7 @@ class EffectDSLCompiler:
     _RE_BOOST = re.compile(r"Boost\s+(\d+)", re.IGNORECASE)
     _RE_CHALLENGER = re.compile(r"Challenger\s*\+(\d+)", re.IGNORECASE)
     _RE_RESIST = re.compile(r"Resist\s*\+(\d+)", re.IGNORECASE)
-    _RE_DRAW = re.compile(r"draw\s+(\d+|a|one|two|three|four)\s+cards?", re.IGNORECASE)
+    _RE_DRAW = re.compile(r"draws?\s+(\d+|a|one|two|three|four|five|six|seven)\s+cards?", re.IGNORECASE)
     _RE_DAMAGE = re.compile(r"deal\s+(\d+)\s+damage", re.IGNORECASE)
     _RE_PUT_DMG_COUNTER = re.compile(r"put\s+(\d+|a)\s+damage\s+counters?\s+on\s+each\s+opposing", re.IGNORECASE)
     _RE_DISCOUNT_CHAR = re.compile(r"you\s+pay\s+(\d+)\s*⬡?\s*less\s+for\s+the\s+next\s+[\w\s]*character", re.IGNORECASE)
@@ -182,7 +190,7 @@ class EffectDSLCompiler:
     _RE_STR_THRESH = re.compile(r"(\d+)\s*(?:\{S\}|¤|Strength)\s+or\s+less", re.IGNORECASE)
     _RE_STR_MIN_THRESH = re.compile(r"(\d+)\s*(?:\{S\}|¤|Strength)\s+or\s+more", re.IGNORECASE)
 
-    _WORD_TO_INT = {"a": 1, "one": 1, "two": 2, "three": 3, "four": 4}
+    _WORD_TO_INT = {"a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7}
 
     @classmethod
     def compile_from_text(
@@ -302,6 +310,8 @@ class EffectDSLCompiler:
             and "give chosen character" not in lower
             and "your detective characters gain" not in lower
             and "your other characters gain" not in lower
+            and "card under this character" not in lower
+            and "cards in your hand" not in lower
         ):
             abilities.resist_bonus = int(m_res.group(1))
 
@@ -358,6 +368,68 @@ class EffectDSLCompiler:
         if "play a character with cost 1 for free" in lower:
             abilities.clauses.append(
                 EffectClause(trigger=default_trig, op=EffectOpType.PLAY_COST1_CHAR_FREE, amount=1)
+            )
+        if "you may play characters from your discard" in lower and "that player" not in lower:
+            # Remember Me (Set 14 Song)
+            abilities.clauses.append(
+                EffectClause(trigger=default_trig, op=EffectOpType.REANIMATE_CHAR, amount=1)
+            )
+        if "if any of the cards that were under them are character cards" in lower and "play those characters from your discard for free" in lower:
+            # Sulley & Boo - Scare Buddies (Set 14 Combo Shift)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_LEAVE_PLAY, op=EffectOpType.REANIMATE_CHAR, amount=1, requires_card_under=True)
+            )
+        if "play a character with cost up to 2 more than the banished character for free" in lower:
+            # Retro Evolution Device (Set 14 Item)
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ACTIVATED,
+                    op=EffectOpType.RETRO_EVOLVE,
+                    amount=2,
+                    cost_ink=1,
+                    requires_exert=True,
+                )
+            )
+        if "put a character card from your discard under this item" in lower:
+            # The Black Cauldron (Set 14 Item)
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ACTIVATED,
+                    op=EffectOpType.PUT_UNDER_FROM_DISCARD,
+                    amount=1,
+                    cost_ink=1,
+                    requires_exert=True,
+                )
+            )
+        if "put 2 character cards from your discard on the bottom of your deck to give this character rush" in lower:
+            # Roller Bob - Sid's Toy (Set 12)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.GIVE_SELF_RUSH, amount=1)
+            )
+        if "move up to 1 damage from chosen character of yours to this character" in lower:
+            # Luisa Madrigal - Confident Climber (Set 13)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ACTIVATED, op=EffectOpType.MOVE_DAMAGE, amount=1, cost_ink=1)
+            )
+        if "put chosen item into its player's inkwell" in lower:
+            # Judy Hopps - On the Case (Set 13)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.INK_ITEM, amount=1)
+            )
+        if "banish chosen item" in lower:
+            # Aladdin - Doing His Part (Set 12)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.BANISH_ITEM, amount=1, cost_ink=1)
+            )
+        if "give chosen character adventurous" in lower:
+            # Nick Wilde - Inquisitive Harbormaster (Set 12)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ON_QUEST, op=EffectOpType.GIVE_ADVENTUROUS, amount=1)
+            )
+        if "chosen gargoyle character gains rush" in lower:
+            # Demona - Imperious Spellcaster (Set 10)
+            abilities.clauses.append(
+                EffectClause(trigger=TriggerType.ACTIVATED, op=EffectOpType.GIVE_RUSH_EVASIVE, amount=1)
             )
         if "characters can't challenge until the start of your next turn" in lower:
             abilities.clauses.append(

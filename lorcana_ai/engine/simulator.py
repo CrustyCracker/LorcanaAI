@@ -260,10 +260,7 @@ class LorcanaSimulator:
                     + attacker.card.abilities.challenger_bonus
                     + attacker.temp_challenger_mod
                 )
-                def_resist = defender.card.abilities.resist_bonus
-                if defender.card.card_type == "Character" and "while you have no cards in your hand, this character gains resist +2" in defender.card.full_text.lower():
-                    if len(opp.hand) == 0:
-                        def_resist += 2
+                def_resist = defender.effective_resist(opp)
                 dmg_to_def = max(0, atk_power - def_resist)
                 # Rafiki - Mystical Fighter (Set 9): "Whenever he challenges a Hyena character, this character takes no damage"
                 takes_no_dmg = "challenges a hyena character" in attacker.card.full_text.lower() and "Hyena" in defender.card.subtypes
@@ -275,11 +272,7 @@ class LorcanaSimulator:
                     if "while you have a villain character in play" in defender.card.full_text.lower():
                         if any("Villain" in e.card.subtypes for e in opp.characters_in_play):
                             base_def += 2
-                    atk_resist = attacker.card.abilities.resist_bonus
-                    if has_lead_detective and "Detective" in attacker.card.subtypes:
-                        atk_resist += 2
-                    if "while you have no cards in your hand, this character gains resist +2" in attacker.card.full_text.lower() and len(p.hand) == 0:
-                        atk_resist += 2
+                    atk_resist = attacker.effective_resist(p)
                     dmg_to_atk = max(0, base_def - atk_resist)
                     attacker.damage += dmg_to_atk
                     # The Prince - Searching for His Love: "During your turn, whenever this character banishes another character in a challenge, draw a card."
@@ -366,6 +359,8 @@ class LorcanaSimulator:
                 ent.temp_strength_mod = 0
             ent.temp_challenger_mod = 0
             ent.temp_lore_mod = 0
+            ent.temp_evasive = False
+            ent.temp_adventurous = False
 
         # 2. Resolve Temporary Shift (CR Rule 8.10.8.5):
         # "At the end of the turn you play a character with Temporary Shift, remove all damage from it and return it to your hand."
@@ -970,7 +965,7 @@ class LorcanaSimulator:
                         e.effective_strength,
                     ),
                 )
-                resist = 0 if unpreventable else best_t.card.abilities.resist_bonus
+                resist = 0 if unpreventable else best_t.effective_resist(opp)
                 dmg = max(0, dmg_amt - resist)
                 best_t.damage += dmg
                 cls._apply_vanish_if_action(state, best_t, is_action_source)
@@ -982,7 +977,7 @@ class LorcanaSimulator:
                 for e in p.characters_in_play
             )
             for e in opp.characters_in_play:
-                resist = 0 if unpreventable else e.card.abilities.resist_bonus
+                resist = 0 if unpreventable else e.effective_resist(opp)
                 dmg = max(0, cl.amount - resist)
                 e.damage += dmg
             cls._cleanup_banished(state)
@@ -995,7 +990,7 @@ class LorcanaSimulator:
             )
             for e in opp.characters_in_play:
                 if e.damage > 0:
-                    resist = 0 if unpreventable else e.card.abilities.resist_bonus
+                    resist = 0 if unpreventable else e.effective_resist(opp)
                     dmg = max(0, cl.amount - resist)
                     e.damage += dmg
             cls._cleanup_banished(state)
@@ -1218,6 +1213,124 @@ class LorcanaSimulator:
                 best_ally = max(exerted_allies, key=lambda e: e.effective_strength)
                 best_ally.exerted = False
 
+        elif op == EffectOpType.RETRO_EVOLVE:
+            # Retro Evolution Device (Set 14): "⟳, 1 ⬡, Banish chosen character of yours — Play a character with cost up to 2 more than the banished character for free."
+            if p.characters_in_play:
+                cand_banish = min(
+                    p.characters_in_play,
+                    key=lambda e: (e.damage > 0, e.effective_lore(p, opp), e.card.cost),
+                )
+                p.board.remove(cand_banish)
+                p.discard.append(cand_banish.card)
+                max_c = cand_banish.card.cost + 2
+                valid_hand_chars = [
+                    (idx, c) for idx, c in enumerate(p.hand)
+                    if c.card_type == "Character" and c.cost <= max_c
+                ]
+                if valid_hand_chars:
+                    best_idx, chosen_evolve = max(
+                        valid_hand_chars,
+                        key=lambda item: (item[1].cost, item[1].lore * 2 + item[1].willpower),
+                    )
+                    p.hand.pop(best_idx)
+                    if chosen_evolve.card_id in p.revealed_hand_ids:
+                        p.revealed_hand_ids.remove(chosen_evolve.card_id)
+                    new_ent = BoardEntity(
+                        instance_id=state.next_instance_id,
+                        card=chosen_evolve,
+                        exerted=False,
+                        drying=True,
+                    )
+                    state.next_instance_id += 1
+                    p.board.append(new_ent)
+                    p.chars_played_this_turn += 1
+                    if p.is_princess_or_queen(chosen_evolve):
+                        p.princess_played_this_turn = True
+                    cls._resolve_clauses(
+                        state, controller_id, chosen_evolve, TriggerType.ON_PLAY, source_id=new_ent.instance_id
+                    )
+
+        elif op == EffectOpType.PUT_UNDER_FROM_DISCARD:
+            # The Black Cauldron (Set 14): "⟳, 1 ⬡ — Put a character card from your discard under this item faceup."
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if source_ent is not None:
+                char_grave = [(i, c) for i, c in enumerate(p.discard) if c.card_type == "Character"]
+                if char_grave:
+                    best_i, chosen_c = max(char_grave, key=lambda item: (item[1].cost, item[1].lore))
+                    p.discard.pop(best_i)
+                    source_ent.cards_under_count += 1
+                    source_ent.shifted_under_cards.append(chosen_c)
+
+        elif op == EffectOpType.GIVE_SELF_RUSH:
+            # Roller Bob - Sid's Toy (Set 12): "When you play this character, you may put 2 character cards from your discard on the bottom of your deck to give this character Rush this turn."
+            char_grave = [c for c in p.discard if c.card_type == "Character"]
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if len(char_grave) >= 2 and source_ent is not None:
+                for _ in range(2):
+                    idx = next(i for i, c in enumerate(p.discard) if c.card_type == "Character")
+                    c = p.discard.pop(idx)
+                    p.deck.insert(0, c)
+                source_ent.drying = False
+
+        elif op == EffectOpType.MOVE_DAMAGE:
+            # Luisa Madrigal - Confident Climber (Set 13): "1 ⬡ — Move up to 1 damage from chosen character of yours to this character. Then, if this character has 3 or more damage, move all damage from this character to chosen opposing character."
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if source_ent is not None:
+                damaged_allies = [e for e in p.characters_in_play if e.instance_id != source_id and e.damage > 0]
+                if damaged_allies:
+                    t_ally = max(damaged_allies, key=lambda e: e.damage)
+                    t_ally.damage -= 1
+                    source_ent.damage += 1
+                if source_ent.damage >= 3 and opp.characters_in_play:
+                    opp_t = max(opp.characters_in_play, key=lambda e: (e.card.lore * 2 + e.effective_strength))
+                    opp_t.damage += source_ent.damage
+                    source_ent.damage = 0
+                    cls._cleanup_banished(state)
+
+        elif op == EffectOpType.INK_ITEM:
+            # Judy Hopps - On the Case (Set 13): "When you play this character, if you have another Detective character in play, you may put chosen item into its player's inkwell facedown and exerted."
+            has_other_det = any("Detective" in e.card.subtypes and e.instance_id != source_id for e in p.characters_in_play)
+            if has_other_det:
+                target_items = [e for e in opp.items_in_play] or [e for e in p.items_in_play if e.instance_id != source_id]
+                if target_items:
+                    best_item = target_items[0]
+                    owner_pl = opp if best_item in opp.board else p
+                    owner_pl.board.remove(best_item)
+                    owner_pl.inkwell_cards.append(best_item.card)
+                    owner_pl.inkwell_total += 1
+
+        elif op == EffectOpType.BANISH_ITEM:
+            # Aladdin - Doing His Part (Set 12): "When you play this character, you may pay 1 ⬡ to banish chosen item."
+            if cl.cost_ink > 0:
+                if p.total_payable_ink < cl.cost_ink:
+                    return
+                p.pay_ink(cl.cost_ink)
+            if opp.items_in_play:
+                t_item = max(opp.items_in_play, key=lambda e: e.card.cost)
+                opp.board.remove(t_item)
+                opp.discard.append(t_item.card)
+
+        elif op == EffectOpType.GIVE_ADVENTUROUS:
+            # Nick Wilde - Inquisitive Harbormaster (Set 12): "Whenever this character quests, you may give chosen character Adventurous until the start of your next turn."
+            if opp.characters_in_play:
+                best_t = max(opp.characters_in_play, key=lambda e: e.effective_strength)
+                best_t.temp_adventurous = True
+
+        elif op == EffectOpType.GIVE_RUSH_EVASIVE:
+            # Demona - Imperious Spellcaster (Set 10): "Choose and discard a card — Chosen Gargoyle character gains Rush and Evasive until the start of your next turn."
+            if p.hand:
+                disc_idx = min(range(len(p.hand)), key=lambda i: (p.hand[i].lore, p.hand[i].cost))
+                discarded = p.hand.pop(disc_idx)
+                p.discard.append(discarded)
+                p.cards_discarded_this_turn += 1
+                if discarded.card_id in p.revealed_hand_ids:
+                    p.revealed_hand_ids.remove(discarded.card_id)
+                gargoyles = [e for e in p.characters_in_play if "Gargoyle" in e.card.subtypes]
+                if gargoyles:
+                    g = gargoyles[0]
+                    g.drying = False
+                    g.temp_evasive = True
+
     @classmethod
     def _cleanup_banished(cls, state: GameState) -> None:
         for pid in (0, 1):
@@ -1241,8 +1354,8 @@ class LorcanaSimulator:
 
             pl.board = remaining
             has_belle_snowfield = any(
-                "when one of your characters is banished" in r.card.full_text.lower()
-                and "put that card into your inkwell" in r.card.full_text.lower()
+                "one of your characters is banished" in r.card.full_text.lower()
+                and "into your inkwell" in r.card.full_text.lower()
                 for r in remaining
             )
             has_mickey_minnie_duo = any(
@@ -1255,7 +1368,7 @@ class LorcanaSimulator:
                 )
                 if ent.card.card_type == "Character" and has_mickey_minnie_duo and pl.deck:
                     pl.hand.append(pl.deck.pop())
-                if ent.card.card_type == "Character" and has_belle_snowfield and pl.inkwell_total < 8:
+                if ent.card.card_type == "Character" and has_belle_snowfield and pl.inkwell_total < 12:
                     # Belle - Snowfield Strategist (Set 11): "When one of your characters is banished, you may put that card into your inkwell facedown and exerted."
                     pl.inkwell_cards.append(ent.card)
                     pl.inkwell_total += 1
