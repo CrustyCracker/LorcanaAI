@@ -169,7 +169,7 @@ class MatchupEvaluator:
         deck_a: Deck,
         deck_b: Deck,
         num_games: int = 24,
-        seed: int = 42,
+        seed: int = 2137,
     ) -> MatchupStats:
         num_games = max(2, num_games)
 
@@ -213,7 +213,7 @@ class MatchupEvaluator:
         deck: Deck,
         meta_decks: dict[str, Deck],
         num_games: int = 24,
-        seed: int = 42,
+        seed: int = 2137,
     ) -> dict[str, MatchupStats]:
         """
         Evaluates `deck` against all `meta_decks` in a single parallel batch across all CPU cores,

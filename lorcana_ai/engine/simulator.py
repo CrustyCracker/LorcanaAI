@@ -1340,49 +1340,56 @@ class LorcanaSimulator:
 
     @classmethod
     def _cleanup_banished(cls, state: GameState) -> None:
-        for pid in (0, 1):
-            pl = state.players[pid]
-            remaining: list[BoardEntity] = []
-            banished: list[BoardEntity] = []
-            banished_location_ids: set[int] = set()
-            for ent in pl.board:
-                if ent.is_banished:
-                    banished.append(ent)
-                    if ent.card.card_type == "Location":
-                        banished_location_ids.add(ent.instance_id)
-                else:
-                    remaining.append(ent)
+        while True:
+            any_banished = False
+            for pid in (0, 1):
+                pl = state.players[pid]
+                remaining: list[BoardEntity] = []
+                banished: list[BoardEntity] = []
+                banished_location_ids: set[int] = set()
+                for ent in pl.board:
+                    if ent.is_banished:
+                        banished.append(ent)
+                        if ent.card.card_type == "Location":
+                            banished_location_ids.add(ent.instance_id)
+                    else:
+                        remaining.append(ent)
 
-            # CR Rule 5.6.6: If a location leaves play, characters at that location remain in play and are no longer at a location
-            if banished_location_ids:
-                for ent in remaining:
-                    if ent.location_instance_id in banished_location_ids:
-                        ent.location_instance_id = -1
+                if banished:
+                    any_banished = True
 
-            pl.board = remaining
-            has_belle_snowfield = any(
-                "one of your characters is banished" in r.card.full_text.lower()
-                and "into your inkwell" in r.card.full_text.lower()
-                for r in remaining
-            )
-            has_mickey_minnie_duo = any(
-                "whenever another character of yours is banished, draw a card" in r.card.full_text.lower()
-                for r in remaining
-            )
-            for ent in banished:
-                cls._resolve_clauses(
-                    state, pid, ent.card, TriggerType.ON_LEAVE_PLAY, source_id=ent.instance_id
+                # CR Rule 5.6.6: If a location leaves play, characters at that location remain in play and are no longer at a location
+                if banished_location_ids:
+                    for ent in remaining:
+                        if ent.location_instance_id in banished_location_ids:
+                            ent.location_instance_id = -1
+
+                pl.board = remaining
+                has_belle_snowfield = any(
+                    "one of your characters is banished" in r.card.full_text.lower()
+                    and "into your inkwell" in r.card.full_text.lower()
+                    for r in remaining
                 )
-                if ent.card.card_type == "Character" and has_mickey_minnie_duo and pl.deck:
-                    pl.hand.append(pl.deck.pop())
-                if ent.card.card_type == "Character" and has_belle_snowfield and pl.inkwell_total < 12:
-                    # Belle - Snowfield Strategist (Set 11): "When one of your characters is banished, you may put that card into your inkwell facedown and exerted."
-                    pl.inkwell_cards.append(ent.card)
-                    pl.inkwell_total += 1
-                else:
-                    pl.discard.append(ent.card)
-                for u_card in ent.shifted_under_cards:
-                    pl.discard.append(u_card)
+                has_mickey_minnie_duo = any(
+                    "whenever another character of yours is banished, draw a card" in r.card.full_text.lower()
+                    for r in remaining
+                )
+                for ent in banished:
+                    cls._resolve_clauses(
+                        state, pid, ent.card, TriggerType.ON_LEAVE_PLAY, source_id=ent.instance_id
+                    )
+                    if ent.card.card_type == "Character" and has_mickey_minnie_duo and pl.deck:
+                        pl.hand.append(pl.deck.pop())
+                    if ent.card.card_type == "Character" and has_belle_snowfield and pl.inkwell_total < 12:
+                        # Belle - Snowfield Strategist (Set 11): "When one of your characters is banished, you may put that card into your inkwell facedown and exerted."
+                        pl.inkwell_cards.append(ent.card)
+                        pl.inkwell_total += 1
+                    else:
+                        pl.discard.append(ent.card)
+                    for u_card in ent.shifted_under_cards:
+                        pl.discard.append(u_card)
+            if not any_banished:
+                break
 
     @classmethod
     def _check_victory(cls, state: GameState) -> bool:

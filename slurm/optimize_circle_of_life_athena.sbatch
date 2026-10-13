@@ -55,7 +55,7 @@ python3 lorcana_cli.py optimize-core \
     --packages 50 \
     --lookahead-depth 1 \
     --workers "${SLURM_CPUS_PER_TASK:-32}" \
-    --seed 2026
+    --seed 2137
 
 # 2. Record Detailed Turn-by-Turn & Action-by-Action Replays into logs/
 python3 lorcana_cli.py watch-game \

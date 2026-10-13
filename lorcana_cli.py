@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 import time
 
@@ -70,19 +71,33 @@ def cmd_sync_cards(_args: argparse.Namespace) -> None:
 
 
 def cmd_sync_meta(args: argparse.Namespace) -> None:
-    print(f"[LorcanaAlpha] Scraping Core Set 14 metagame from https://duels.ink/stats/{args.queue} ...")
-    profiles = sync_duels_ink_meta(queue=args.queue, period=args.period, era=args.era, export_txt_files=True)
-    print("\n" + "=" * 95)
-    print(f"SCRAPED DUELS.INK META ARCHETYPES ({args.queue.upper()} | Era: {args.era} | Period: {args.period})")
-    print("=" * 95)
-    for idx, prof in enumerate(profiles[:15], 1):
+    dedup = not getattr(args, "include_variants", False)
+    top_n = getattr(args, "top_n", 15)
+    print(f"[LorcanaAlpha] Pobieranie metagry Core Set 14 z https://duels.ink/stats/{args.queue} ...")
+    profiles = sync_duels_ink_meta(
+        queue=args.queue,
+        period=args.period,
+        era=args.era,
+        export_txt_files=True,
+        top_n=top_n,
+        deduplicate_by_name=dedup,
+    )
+    print("\n" + "=" * 105)
+    print(f"ZESKREJPOWANE TALIE METAGRY DUELS.INK ({args.queue.upper()} | Era: {args.era} | Okres: {args.period}) — TOP {len(profiles)} ARCHETYPÓW")
+    print("=" * 105)
+    out_dir = PROJECT_ROOT / "decks" / f"duels_ink_{args.queue.replace('-', '_')}"
+    for idx, prof in enumerate(profiles, 1):
         sigs = ", ".join(prof.signature_cards[:3])
+        safe_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", prof.name).strip("_").lower()
+        file_basename = f"{idx:02d}_{safe_slug}.txt"
         print(
-            f"{idx:2d}. {prof.name:<34} | Games: {prof.games_played:5d} | "
-            f"Winrate: {prof.win_rate:5.2f}% | Share: {prof.meta_share*100:5.1f}% | Key: {sigs}"
+            f"{idx:2d}. {prof.name:<34} | Mecze: {prof.games_played:5d} | "
+            f"WR: {prof.win_rate:5.2f}% | Meta: {prof.meta_share*100:4.1f}% | Plik: {file_basename}\n"
+            f"    Kluczowe karty: {sigs}"
         )
-    print("=" * 95)
-    print(f"[OK] Exported {len(profiles)} Dreamborn-format .txt decklists to {EXPORTED_DECKS_DIR}")
+    print("=" * 105)
+    print(f"[OK] Wyeksportowano {len(profiles)} gotowych talii w formacie Dreamborn .txt do: {out_dir}")
+    print(f"[OK] Plik spisu i zestawienia metagry: {out_dir / '00_META_OVERVIEW.txt'}")
 
 
 def cmd_optimize_core(args: argparse.Namespace) -> None:
@@ -125,6 +140,7 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
         archetype_name=args.archetype,
         games_per_matchup=args.games,
         package_candidates=args.packages,
+        candidate_pool_size=args.tech_candidates,
         seed=args.seed,
         baseline_deck=baseline_deck,
     )
@@ -132,10 +148,15 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     print("\n" + "=" * 105)
     print(f"RANKING KART TECHOWYCH I WPŁYW % NA MATCHUPY DLA: {report.archetype_name}")
     print("=" * 105)
-    for idx, te in enumerate(report.top_tech_cards[:12], 1):
+    for idx, te in enumerate(report.top_tech_cards[:16], 1):
         ink_str = "Inkable" if te.inkable else "Uninkable"
         s_bo1 = "+" if te.delta_bo1_winrate >= 0 else ""
         s_bo3 = "+" if te.delta_bo3_winrate >= 0 else ""
+        tag = "[Tech z rdzenia]" if te.is_core_tech else "[Tech zewnętrzny]"
+        if te.is_core_tech:
+            copies_desc = f"{te.core_copies}x w rdzeniu -> {te.recommended_copies}x (+{te.recommended_copies - te.core_copies} kopie)"
+        else:
+            copies_desc = f"{te.recommended_copies}x (+{te.recommended_copies} kopie)"
         deltas_parts = []
         for opp_nm, d_val in te.matchup_deltas.items():
             short_opp = opp_nm.replace("Midrange", "Mid").replace("Control", "Ctrl").replace("Good Stuff", "GS")
@@ -144,7 +165,7 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
             deltas_parts.append(f"{short_opp}: {w_val*100:.0f}% ({d_sign}{d_val*100:.1f}%)")
         deltas_line = " | ".join(deltas_parts)
         print(
-            f"{idx:2d}. {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {te.recommended_copies}x\n"
+            f"{idx:2d}. {tag} {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {copies_desc}\n"
             f"    Meta BO1 WR: {te.expected_bo1_winrate*100:.1f}% ({s_bo1}{te.delta_bo1_winrate*100:.1f}% vs baza) | "
             f"BO3 WR: {te.expected_bo3_winrate*100:.1f}% ({s_bo3}{te.delta_bo3_winrate*100:.1f}% vs baza) | "
             f"Play: {te.play_winrate*100:.1f}% | Draw: {te.draw_winrate*100:.1f}%\n"
@@ -476,6 +497,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_meta.add_argument("--queue", type=str, default="core-bo1", help="Duels.ink queue ID (e.g. core-bo1, core-bo3)")
     p_meta.add_argument("--period", type=str, default="all_time", help="Time period (all_time or week)")
     p_meta.add_argument("--era", type=str, default="set14", help="Era identifier (default: set14)")
+    p_meta.add_argument("--top-n", type=int, default=15, help="Liczba unikalnych archetypów metagry do pobrania (domyślnie: 15)")
+    p_meta.add_argument("--include-variants", action="store_true", help="Pobieraj również warianty centroidów (v2, v3) zamiast deduplikacji")
 
     p_opt = sub.add_parser(
         "optimize-core",
@@ -486,10 +509,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt.add_argument("--baseline-file", type=str, default="", help="Optional path to starting 60-card baseline .txt file")
     p_opt.add_argument("--top-meta", type=int, default=8, help="Number of top Duels.ink meta decks in gauntlet")
     p_opt.add_argument("--games", type=int, default=16, help="Games simulated per matchup")
-    p_opt.add_argument("--packages", type=int, default=8, help="Number of candidate 16-card flex packages to evaluate")
+    p_opt.add_argument("--packages", type=int, default=8, help="Number of candidate flex packages to evaluate")
+    p_opt.add_argument("--tech-candidates", type=int, default=36, help="Number of candidate tech cards to evaluate in Phase 1 (including under-capped core cards)")
     p_opt.add_argument("--workers", type=int, default=0, help="Number of parallel CPU worker processes (0 = auto)")
     p_opt.add_argument("--lookahead-depth", type=int, default=1, help="Turn lookahead depth (0=greedy, 1=turn rollout, 2=turn+crackback)")
-    p_opt.add_argument("--seed", type=int, default=2026)
+    p_opt.add_argument("--seed", type=int, default=2137)
 
     p_watch = sub.add_parser(
         "watch-game",
@@ -502,7 +526,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--agent", type=str, choices=["heuristic", "is-mcts"], default="heuristic", help="Action selection algorithm (heuristic or is-mcts)")
     p_watch.add_argument("--simulations", type=int, default=16, help="IS-MCTS simulations per determinization")
     p_watch.add_argument("--determinizations", type=int, default=4, help="IS-MCTS number of determinizations")
-    p_watch.add_argument("--seed", type=int, default=2026)
+    p_watch.add_argument("--seed", type=int, default=2137)
 
 
     p_train = sub.add_parser("train", help="Run Self-Play RL & Opponent Belief Network training")

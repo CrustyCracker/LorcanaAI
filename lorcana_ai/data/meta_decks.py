@@ -60,11 +60,13 @@ def sync_duels_ink_meta(
     era: str = "set14",
     export_txt_files: bool = True,
     timeout: int = 20,
+    top_n: int = 15,
+    deduplicate_by_name: bool = True,
 ) -> list[DuelsInkArchetypeProfile]:
     """
     Fetches live Core Constructed Season 14 metagame statistics & centroid decklists from
     https://duels.ink/stats/core-bo1 (via /api/stats/meta), caches the JSON in data_cache/,
-    and optionally exports Dreamborn-format .txt decklists into decks/duels_ink_core_bo1/.
+    and optionally exports Dreamborn-format .txt decklists into decks/duels_ink_{queue}/.
     """
     import urllib.parse
     import urllib.request
@@ -82,29 +84,59 @@ def sync_duels_ink_meta(
 
     profiles = load_duels_ink_profiles(
         cache_path=cache_path,
-        top_n=25,
-        deduplicate_by_name=False,
+        top_n=top_n,
+        deduplicate_by_name=deduplicate_by_name,
     )
     if export_txt_files:
-        export_profiles_to_txt(profiles, EXPORTED_DECKS_DIR)
+        queue_dir = PROJECT_ROOT / "decks" / f"duels_ink_{queue.replace('-', '_')}"
+        export_profiles_to_txt(profiles, queue_dir)
     return profiles
 
 
-def export_profiles_to_txt(profiles: list[DuelsInkArchetypeProfile], target_dir: Path | None = None) -> list[Path]:
-    """Writes scraped Duels.ink meta decks as Dreamborn-compatible .txt files."""
+def export_profiles_to_txt(
+    profiles: list[DuelsInkArchetypeProfile],
+    target_dir: Path | None = None,
+    clean_dir: bool = True,
+) -> list[Path]:
+    """Writes scraped Duels.ink meta decks as Dreamborn-compatible .txt files and creates a summary overview."""
     out_dir = target_dir or EXPORTED_DECKS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
+    if clean_dir:
+        for old_f in out_dir.glob("*.txt"):
+            try:
+                old_f.unlink()
+            except Exception:
+                pass
+
     written: list[Path] = []
+    summary_lines = [
+        "=" * 105,
+        "DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14)",
+        "=" * 105,
+        f"{'#':<3} {'Archetyp':<34} {'Atrament':<18} {'Mecze':<8} {'Winrate':<8} {'Meta Share':<12} {'Plik talii'}",
+        "-" * 105,
+    ]
+
     for idx, prof in enumerate(profiles, 1):
         safe_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", prof.name).strip("_").lower()
-        fname = out_dir / f"{idx:02d}_{safe_slug}_{prof.games_played}g.txt"
+        file_basename = f"{idx:02d}_{safe_slug}.txt"
+        fname = out_dir / file_basename
         header = (
             f"# {prof.name} ({prof.ink_pair})\n"
             f"# Source: https://duels.ink/stats/core-bo1 (ID: {prof.profile_id})\n"
             f"# Games Played: {prof.games_played} | Win Rate: {prof.win_rate:.2f}% | Meta Share: {prof.meta_share*100:.2f}%\n"
+            f"# Signature Cards: {', '.join(prof.signature_cards[:4])}\n"
         )
         fname.write_text(header + prof.deck.to_dreamborn_text() + "\n", encoding="utf-8")
         written.append(fname)
+        summary_lines.append(
+            f"{idx:2d}. {prof.name:<33} {prof.ink_pair:<18} {prof.games_played:<8d} "
+            f"{prof.win_rate:5.2f}%   {prof.meta_share*100:5.2f}%       {file_basename}"
+        )
+
+    summary_lines.append("=" * 105)
+    summary_path = out_dir / "00_META_OVERVIEW.txt"
+    summary_path.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
     return written
 
 

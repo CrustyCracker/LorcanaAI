@@ -1,0 +1,18 @@
+=========================================================================================================
+DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14)
+=========================================================================================================
+#   Archetyp                           Atrament           Mecze    Winrate  Meta Share   Plik talii
+---------------------------------------------------------------------------------------------------------
+ 1. Amber/Emerald Circle of Life      Amber/Emerald      13093    56.03%   21.28%       01_amber_emerald_circle_of_life.txt
+ 2. Amber/Emerald Princess Aggro      Amber/Emerald      8072     53.91%   13.12%       02_amber_emerald_princess_aggro.txt
+ 3. Amber/Sapphire Control            Amber/Sapphire     6940     49.37%   11.28%       03_amber_sapphire_control.txt
+ 4. Amber/Sapphire Detectives         Amber/Sapphire     6829     54.21%   11.10%       04_amber_sapphire_detectives.txt
+ 5. Emerald/Steel Midrange            Emerald/Steel      6439     58.35%   10.47%       05_emerald_steel_midrange.txt
+ 6. Amethyst/Steel Midrange           Amethyst/Steel     6372     53.89%   10.36%       06_amethyst_steel_midrange.txt
+ 7. Emerald/Sapphire Mouse House      Emerald/Sapphire   4146     49.64%    6.74%       07_emerald_sapphire_mouse_house.txt
+ 8. Amber/Amethyst Midrange           Amber/Amethyst     2786     51.87%    4.53%       08_amber_amethyst_midrange.txt
+ 9. Amethyst/Emerald Retro Device     Amethyst/Emerald   2140     49.77%    3.48%       09_amethyst_emerald_retro_device.txt
+10. Amber/Ruby Leviathan Circle       Amber/Ruby         1879     45.72%    3.05%       10_amber_ruby_leviathan_circle.txt
+11. Amber/Amethyst Aggro              Amber/Amethyst     1440     52.50%    2.34%       11_amber_amethyst_aggro.txt
+12. Amber/Steel Lilo & Stitch Songs   Amber/Steel        1378     49.35%    2.24%       12_amber_steel_lilo_stitch_songs.txt
+=========================================================================================================

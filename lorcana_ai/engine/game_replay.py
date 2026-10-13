@@ -88,7 +88,7 @@ def simulate_and_format_replay(
     deck_a: Deck,
     deck_b: Deck,
     starting_player: int = 0,
-    seed: int = 2026,
+    seed: int = 2137,
     lookahead_depth: int = 1,
     know_opponent_inks: bool = True,
     agent_type: str = "heuristic",

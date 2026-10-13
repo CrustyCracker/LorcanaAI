@@ -74,25 +74,24 @@ class TacticalHeuristicAgent:
                 if next_act.action_type == ActionType.PASS_TURN:
                     break
 
-            # Optional Depth-2: simulate opponent's best crackback turn
-            if (
-                self.lookahead_depth >= 2
-                and sim_state.phase != "GAME_OVER"
-                and sim_state.active_player == (1 - p_id)
-            ):
-                opp_steps = 0
+            # Multi-turn rollout up to self.lookahead_depth turns (crackback and subsequent turns)
+            turns_simulated = 1
+            while turns_simulated < self.lookahead_depth and sim_state.phase != "GAME_OVER":
+                turns_simulated += 1
+                curr_p = sim_state.active_player
+                turn_steps = 0
                 while (
                     sim_state.phase != "GAME_OVER"
-                    and sim_state.active_player == (1 - p_id)
-                    and opp_steps < 8
+                    and sim_state.active_player == curr_p
+                    and turn_steps < 8
                 ):
-                    opp_steps += 1
-                    opp_legal = MoveGenerator.generate_legal_actions(sim_state)
-                    if not opp_legal:
+                    turn_steps += 1
+                    curr_legal = MoveGenerator.generate_legal_actions(sim_state)
+                    if not curr_legal:
                         break
-                    opp_act = max(opp_legal, key=lambda a: self.score_action(sim_state, a))
-                    LorcanaSimulator.step(sim_state, opp_act, rng=det_rng)
-                    if opp_act.action_type == ActionType.PASS_TURN:
+                    curr_act = max(curr_legal, key=lambda a: self.score_action(sim_state, a))
+                    LorcanaSimulator.step(sim_state, curr_act, rng=det_rng)
+                    if curr_act.action_type == ActionType.PASS_TURN:
                         break
 
             state_val = self.evaluate_state(sim_state, p_id)

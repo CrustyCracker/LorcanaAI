@@ -53,9 +53,10 @@ python3 scripts/optimize_green_steel.py \
     --top-meta 10 \
     --games 1200 \
     --packages 48 \
+    --tech-candidates 40 \
     --lookahead-depth 1 \
     --workers "${SLURM_CPUS_PER_TASK:-32}" \
-    --seed 2026
+    --seed 2137
 
 # 2. Generowanie szczegółowych zapisów rozgrywek (Play-by-Play Replays) vs kluczowe talie metagry
 python3 lorcana_cli.py watch-game \
@@ -63,14 +64,14 @@ python3 lorcana_cli.py watch-game \
     --deck-b "Amber/Emerald Princess Aggro" \
     --games 4 \
     --lookahead-depth 2 \
-    --seed 2026
+    --seed 2137
 
 python3 lorcana_cli.py watch-game \
     --deck-a "Green Steel" \
     --deck-b "Amber/Emerald Circle of Life" \
     --games 4 \
     --lookahead-depth 2 \
-    --seed 2026
+    --seed 2137
 
 echo "=================================================================="
 echo "[OK] Zakończono optymalizację Green Steel na Athenie."

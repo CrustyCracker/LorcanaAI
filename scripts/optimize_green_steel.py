@@ -61,6 +61,12 @@ def parse_args() -> argparse.Namespace:
         help="Liczba kombinacji pakietów flex do przetestowania (domyślnie: 10)",
     )
     parser.add_argument(
+        "--tech-candidates",
+        type=int,
+        default=36,
+        help="Liczba kandydatów na karty techowe do przetestowania w Fazie 1 (w tym karty z rdzenia, domyślnie: 36)",
+    )
+    parser.add_argument(
         "--top-meta",
         type=int,
         default=8,
@@ -81,8 +87,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seed",
         type=int,
-        default=2026,
-        help="Ziarno losowości dla Common Random Numbers (domyślnie: 2026)",
+        default=2137,
+        help="Ziarno losowości dla Common Random Numbers (domyślnie: 2137)",
     )
     return parser.parse_args()
 
@@ -122,6 +128,7 @@ def main() -> None:
         archetype_name="Emerald/Steel Green Steel",
         games_per_matchup=args.games,
         package_candidates=args.packages,
+        candidate_pool_size=args.tech_candidates,
         seed=args.seed,
         baseline_deck=baseline_deck,
     )
@@ -129,10 +136,15 @@ def main() -> None:
     print("\n" + "=" * 105)
     print(f"RANKING INDYWIDUALNYCH KART TECHOWYCH (WPŁYW NA WINRATE VS BAZA)")
     print("=" * 105)
-    for idx, te in enumerate(report.top_tech_cards[:12], 1):
+    for idx, te in enumerate(report.top_tech_cards[:16], 1):
         ink_str = "Inkable" if te.inkable else "Uninkable"
         s_bo1 = "+" if te.delta_bo1_winrate >= 0 else ""
         s_bo3 = "+" if te.delta_bo3_winrate >= 0 else ""
+        tag = "[Tech z rdzenia]" if te.is_core_tech else "[Tech zewnętrzny]"
+        if te.is_core_tech:
+            copies_desc = f"{te.core_copies}x w rdzeniu -> {te.recommended_copies}x (+{te.recommended_copies - te.core_copies} kopie)"
+        else:
+            copies_desc = f"{te.recommended_copies}x (+{te.recommended_copies} kopie)"
         deltas_parts = []
         for opp_nm, d_val in te.matchup_deltas.items():
             short_opp = opp_nm.replace("Midrange", "Mid").replace("Control", "Ctrl").replace("Good Stuff", "GS")
@@ -141,7 +153,7 @@ def main() -> None:
             deltas_parts.append(f"{short_opp}: {w_val*100:.0f}% ({d_sign}{d_val*100:.1f}%)")
         deltas_line = " | ".join(deltas_parts)
         print(
-            f"{idx:2d}. {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {te.recommended_copies}x\n"
+            f"{idx:2d}. {tag} {te.card_name} (Koszt: {te.cost}, {ink_str}, {te.card_type}) — Zalecane: {copies_desc}\n"
             f"    Meta BO1 WR: {te.expected_bo1_winrate*100:.1f}% ({s_bo1}{te.delta_bo1_winrate*100:.1f}% vs baza) | "
             f"BO3 WR: {te.expected_bo3_winrate*100:.1f}% ({s_bo3}{te.delta_bo3_winrate*100:.1f}% vs baza) | "
             f"Play: {te.play_winrate*100:.1f}% | Draw: {te.draw_winrate*100:.1f}%\n"
