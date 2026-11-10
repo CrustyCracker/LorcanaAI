@@ -12,25 +12,27 @@
 ## Podsumowanie
 
 - Gracze z ≥1 kartą item hate: **27 / 50** list (~54%)
-- Najwięcej adoption: **Aladdin - Doing His Part** (8 talii / 16 kopii), **Elisa Maza - Hardworking Detective** (7 talii / 28 kopii), **Mowgli - Man Cub** (7 talii / 24 kopii)
+- Najwięcej adoption: **Aladdin - Doing His Part** (8 talii / 16 kopii, avg 2), **Elisa Maza - Hardworking Detective** (7 talii / 28 kopii, avg 4), **Mowgli - Man Cub** (7 talii / 24 kopii, avg 3.4)
 - **Hand discard (non-character) w fieldzie:**
-  - Elisa Maza - Hardworking Detective: 7 talii / 28 kopii
-  - Mowgli - Man Cub: 7 talii / 24 kopii
-  - Timon - Snowball Swiper: 1 talii / 3 kopii
+  - Elisa Maza - Hardworking Detective: 7 talii / 28 kopii (avg 4)
+  - Mowgli - Man Cub: 7 talii / 24 kopii (avg 3.4)
+  - Timon - Snowball Swiper: 1 talii / 3 kopii (avg 3)
 
 ## Ranking kart (adoption / copies)
 
-| Karta | Tekst (skrót) | Typ | Decks | Copies |
-|---|---|---|---:|---:|
-| Aladdin - Doing His Part | CLEAR IT OUT When you play this character, you may pay 1 {I} to banish chosen item. | board item | 8 | 16 |
-| Elisa Maza - Hardworking Detective | FOLLOW THE TRAIL When you play this character, if you have another Detective character in… | hand discard | 7 | 28 |
-| Mowgli - Man Cub | HAVE A BETTER LOOK When you play this character, chosen opponent reveals their hand and d… | hand discard | 7 | 24 |
-| Judy Hopps - On the Case | HIDDEN CLUES When you play this character, if you have another Detective character in pla… | board item | 6 | 17 |
-| Wildcat - Unconventional Mechanic | WELL, THAT'S BROKEN When you play this character, you may banish chosen item. | board item | 5 | 11 |
-| Benja - Guardian of the Dragon Gem | WE HAVE A CHOICE When you play this character, you may banish chosen item. | board item | 2 | 3 |
-| Sabotage | Banish chosen item or location and all other items or locations with the same name. | board item | 2 | 2 |
-| Vincenzo Santorini - On the Run | Evasive (Only characters with Evasive can challenge this character.) NEUTRALIZE Opposing … | board item | 1 | 4 |
-| Timon - Snowball Swiper | GET RID OF THAT When you play this character, chosen opponent reveals their hand and disc… | hand discard | 1 | 3 |
+_Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już grają tę kartę (`copies / decks`).
+
+| Karta | Tekst (skrót) | Typ | Decks | Copies | Avg (gdy grana) |
+|---|---|---|---:|---:|---:|
+| Aladdin - Doing His Part | CLEAR IT OUT When you play this character, you may pay 1 {I} to banish chosen item. | board item | 8 | 16 | 2 |
+| Elisa Maza - Hardworking Detective | FOLLOW THE TRAIL When you play this character, if you have another Detective character in… | hand discard | 7 | 28 | 4 |
+| Mowgli - Man Cub | HAVE A BETTER LOOK When you play this character, chosen opponent reveals their hand and d… | hand discard | 7 | 24 | 3.4 |
+| Judy Hopps - On the Case | HIDDEN CLUES When you play this character, if you have another Detective character in pla… | board item | 6 | 17 | 2.8 |
+| Wildcat - Unconventional Mechanic | WELL, THAT'S BROKEN When you play this character, you may banish chosen item. | board item | 5 | 11 | 2.2 |
+| Benja - Guardian of the Dragon Gem | WE HAVE A CHOICE When you play this character, you may banish chosen item. | board item | 2 | 3 | 1.5 |
+| Sabotage | Banish chosen item or location and all other items or locations with the same name. | board item | 2 | 2 | 1 |
+| Vincenzo Santorini - On the Run | Evasive (Only characters with Evasive can challenge this character.) NEUTRALIZE Opposing … | board item | 1 | 4 | 4 |
+| Timon - Snowball Swiper | GET RID OF THAT When you play this character, chosen opponent reveals their hand and disc… | hand discard | 1 | 3 | 3 |
 
 ## Pełna tabela: każda karta × każdy gracz
 
@@ -41,6 +43,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 16
 - **Liczba talii/graczy:** 8
+- **Średnio kopii (gdy grana):** 2
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -60,6 +63,7 @@
 - **Kategoria:** hand discard (non-character)
 - **Suma kopii:** 28
 - **Liczba talii/graczy:** 7
+- **Średnio kopii (gdy grana):** 4
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -78,6 +82,7 @@
 - **Kategoria:** hand discard (non-character)
 - **Suma kopii:** 24
 - **Liczba talii/graczy:** 7
+- **Średnio kopii (gdy grana):** 3.4
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -96,6 +101,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 17
 - **Liczba talii/graczy:** 6
+- **Średnio kopii (gdy grana):** 2.8
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -113,6 +119,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 11
 - **Liczba talii/graczy:** 5
+- **Średnio kopii (gdy grana):** 2.2
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -129,6 +136,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 3
 - **Liczba talii/graczy:** 2
+- **Średnio kopii (gdy grana):** 1.5
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -142,6 +150,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 2
 - **Liczba talii/graczy:** 2
+- **Średnio kopii (gdy grana):** 1
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -155,6 +164,7 @@
 - **Kategoria:** board item
 - **Suma kopii:** 4
 - **Liczba talii/graczy:** 1
+- **Średnio kopii (gdy grana):** 4
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
@@ -167,6 +177,7 @@
 - **Kategoria:** hand discard (non-character)
 - **Suma kopii:** 3
 - **Liczba talii/graczy:** 1
+- **Średnio kopii (gdy grana):** 3
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
