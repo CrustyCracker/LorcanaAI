@@ -1,0 +1,20 @@
+# Amber/Amethyst Aggro (Amber/Amethyst)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1b9db-ea48-7c92-babc-6ea8330b5b22)
+# Games Played: 1758 | Win Rate: 53.24% | Meta Share: 3.48%
+# Signature Cards: Pocahontas - Guiding the Tribe, Pocahontas - Following the Wind, Pocahontas - Peacekeeper
+4 Aurora - Holding Court
+4 Mickey Mouse - Best in Town
+4 Rapunzel - Outgoing Artist
+4 The Prince - Searching for His Love
+4 Thomas - Wide-Eyed Recruit
+4 Tinker Bell - Curious Fairy
+4 Will o' the Wisp - Forest Spirit
+4 Mike Wazowski - Heroic Climber
+4 Pocahontas - Following the Wind
+4 Pocahontas - Guiding the Tribe
+4 Nani - Stage Manager
+4 Pocahontas - Finding the Way
+4 Dale - Ready for His Shot
+2 Dash Parr - Lava Runner
+2 Magnificent, Marvelous
+4 Pocahontas - Peacekeeper

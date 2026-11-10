@@ -1,18 +1,19 @@
 # Emerald/Steel Midrange (Emerald/Steel)
-# Source: https://duels.ink/stats/core-bo1 (ID: 01a11e48-5a62-712f-a99d-bc537852cdfe)
-# Games Played: 6439 | Win Rate: 58.35% | Meta Share: 10.47%
-# Signature Cards: Vixey - Forest Friend, Tod - All Alone, White Rabbit - Late Again
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1b9db-ea54-717d-96b9-9bd40f375ece)
+# Games Played: 6886 | Win Rate: 53.01% | Meta Share: 13.64%
+# Signature Cards: Angela - Night Warrior, Vixey - Forest Friend, Tod - All Alone
 1 Bobby Zimuruski - Spray Cheese Kid
 1 Darkwing Duck - Crime Fighter
 1 Don Karnage - Khan's Courier
-4 Pegasus - Gift for Hercules
+1 Omnidroid - V.8
+3 Pegasus - Gift for Hercules
 4 Tod - All Alone
-1 You Broke My Smolder
-4 Flash - Efficient Clerk
+3 Flash - Efficient Clerk
 2 Toulouse - Rough and Tumble
 4 Ursula - Deceiver
 4 White Rabbit - Late Again
-3 Angela - Night Warrior
+4 Angela - Night Warrior
+1 Francine - Eyeing the Evidence
 3 Max Goof - Rebellious Teen
 4 Mushu - Stealthy Dragon
 4 Strength of a Raging Fire

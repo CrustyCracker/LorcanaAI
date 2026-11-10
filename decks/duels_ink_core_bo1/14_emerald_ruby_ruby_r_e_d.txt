@@ -1,0 +1,21 @@
+# Emerald/Ruby Ruby R.E.D. (Emerald/Ruby)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1b9db-ea70-70c0-a5b9-333860bea014)
+# Games Played: 1393 | Win Rate: 44.80% | Meta Share: 2.76%
+# Signature Cards: Olaf - Snowman of Action, Lyle Tiberius Rourke - Adventurer for Hire, Improvise
+4 Improvise
+4 Inner Strength
+4 Rivera Family Photo
+4 Another Tale to Spin
+4 Lyle Tiberius Rourke - Adventurer for Hire
+4 Strike a Good Match
+4 Malicious, Mean, and Scary
+4 Max Goof - Karaoke Star
+4 Retro Evolution Device
+1 Roller Bob - Sid's Toy
+4 The Torn Corner
+4 Tod - Clever Fox
+2 Strange Things
+2 To Wither a Flower
+4 Olaf - Snowman of Action
+3 Prince Phillip - Vanquisher of Foes
+4 The Leviathan - Guardian of Atlantis

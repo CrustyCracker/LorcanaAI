@@ -1,0 +1,507 @@
+{
+  "user_one_drops": 17,
+  "variants": {
+    "user_baseline": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.5,
+          "play_wr": 0.75,
+          "draw_wr": 0.25,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.3333,
+          "play_wr": 0.5,
+          "draw_wr": 0.1667,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.625,
+          "play_wr": 0.6667,
+          "draw_wr": 0.5833,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.75,
+          "play_wr": 1.0,
+          "draw_wr": 0.5,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.7083,
+          "play_wr": 0.9167,
+          "draw_wr": 0.5,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5417,
+          "play_wr": 0.8333,
+          "draw_wr": 0.25,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.4167,
+          "play_wr": 0.6667,
+          "draw_wr": 0.1667,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.75,
+          "draw_wr": 0.0833,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.5236308799999999,
+      "one_drops": 17
+    },
+    "week_centroid_flex": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.375,
+          "play_wr": 0.4167,
+          "draw_wr": 0.3333,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.5,
+          "play_wr": 0.6667,
+          "draw_wr": 0.3333,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.5417,
+          "play_wr": 0.5833,
+          "draw_wr": 0.5,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.75,
+          "play_wr": 0.8333,
+          "draw_wr": 0.6667,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.5417,
+          "play_wr": 0.75,
+          "draw_wr": 0.3333,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.4583,
+          "play_wr": 0.75,
+          "draw_wr": 0.1667,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.5833,
+          "play_wr": 0.75,
+          "draw_wr": 0.4167,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.3333,
+          "play_wr": 0.4167,
+          "draw_wr": 0.25,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.5016133399999998,
+      "one_drops": 18
+    },
+    "more_onedrops_20": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.375,
+          "play_wr": 0.5,
+          "draw_wr": 0.25,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.5,
+          "play_wr": 0.6667,
+          "draw_wr": 0.3333,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.625,
+          "play_wr": 0.6667,
+          "draw_wr": 0.5833,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.7917,
+          "play_wr": 0.9167,
+          "draw_wr": 0.6667,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.5833,
+          "play_wr": 0.8333,
+          "draw_wr": 0.3333,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5417,
+          "play_wr": 1.0,
+          "draw_wr": 0.0833,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.4583,
+          "play_wr": 0.75,
+          "draw_wr": 0.1667,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.2917,
+          "play_wr": 0.4167,
+          "draw_wr": 0.1667,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.5168605099999999,
+      "one_drops": 19
+    },
+    "cut_amber_champ_add_expedition": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.5417,
+          "play_wr": 0.8333,
+          "draw_wr": 0.25,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.375,
+          "play_wr": 0.5833,
+          "draw_wr": 0.1667,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.5833,
+          "play_wr": 0.6667,
+          "draw_wr": 0.5,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.75,
+          "play_wr": 0.9167,
+          "draw_wr": 0.5833,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.625,
+          "play_wr": 0.8333,
+          "draw_wr": 0.4167,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.5833,
+          "draw_wr": 0.25,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.3333,
+          "play_wr": 0.5,
+          "draw_wr": 0.1667,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.4583,
+          "play_wr": 0.8333,
+          "draw_wr": 0.0833,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.5118795499999998,
+      "one_drops": 17
+    },
+    "detectives_tech_rapunzel_up": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.4167,
+          "play_wr": 0.6667,
+          "draw_wr": 0.1667,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.375,
+          "play_wr": 0.5833,
+          "draw_wr": 0.1667,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.4167,
+          "play_wr": 0.4167,
+          "draw_wr": 0.4167,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.8333,
+          "play_wr": 1.0,
+          "draw_wr": 0.6667,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.5833,
+          "play_wr": 0.75,
+          "draw_wr": 0.4167,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5,
+          "play_wr": 0.9167,
+          "draw_wr": 0.0833,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.4167,
+          "play_wr": 0.5833,
+          "draw_wr": 0.25,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.5,
+          "play_wr": 0.8333,
+          "draw_wr": 0.1667,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.47966673999999987,
+      "one_drops": 17
+    },
+    "percys_package": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.4167,
+          "play_wr": 0.5833,
+          "draw_wr": 0.25,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.5,
+          "draw_wr": 0.3333,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.6667,
+          "play_wr": 0.8333,
+          "draw_wr": 0.5,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.7917,
+          "play_wr": 0.9167,
+          "draw_wr": 0.6667,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.5833,
+          "play_wr": 0.75,
+          "draw_wr": 0.4167,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5,
+          "play_wr": 0.6667,
+          "draw_wr": 0.3333,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.4583,
+          "play_wr": 0.5,
+          "draw_wr": 0.4167,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.5417,
+          "play_wr": 0.75,
+          "draw_wr": 0.3333,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.5274476399999999,
+      "one_drops": 18
+    },
+    "monterey_jack_2": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.3333,
+          "play_wr": 0.5,
+          "draw_wr": 0.1667,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.5833,
+          "draw_wr": 0.25,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.5833,
+          "play_wr": 0.75,
+          "draw_wr": 0.4167,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.875,
+          "play_wr": 0.9167,
+          "draw_wr": 0.8333,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.5,
+          "play_wr": 0.5833,
+          "draw_wr": 0.4167,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5833,
+          "play_wr": 0.8333,
+          "draw_wr": 0.3333,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.5,
+          "play_wr": 0.6667,
+          "draw_wr": 0.3333,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.6667,
+          "draw_wr": 0.1667,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.4993809699999999,
+      "one_drops": 17
+    },
+    "onedrops_18_finick": {
+      "matchups": {
+        "Amber/Sapphire Detectives": {
+          "wr": 0.375,
+          "play_wr": 0.5,
+          "draw_wr": 0.25,
+          "share": 0.22149999999999995,
+          "games": 24
+        },
+        "Emerald/Steel Midrange": {
+          "wr": 0.4167,
+          "play_wr": 0.3333,
+          "draw_wr": 0.5,
+          "share": 0.19959999999999994,
+          "games": 24
+        },
+        "Amber/Emerald Circle of Life": {
+          "wr": 0.5833,
+          "play_wr": 0.8333,
+          "draw_wr": 0.3333,
+          "share": 0.15119999999999997,
+          "games": 24
+        },
+        "Amber/Sapphire Control": {
+          "wr": 0.8333,
+          "play_wr": 1.0,
+          "draw_wr": 0.6667,
+          "share": 0.10249999999999997,
+          "games": 24
+        },
+        "Amethyst/Emerald Retro Device": {
+          "wr": 0.6667,
+          "play_wr": 0.9167,
+          "draw_wr": 0.4167,
+          "share": 0.09959999999999997,
+          "games": 24
+        },
+        "Amethyst/Ruby Midrange": {
+          "wr": 0.5833,
+          "play_wr": 0.6667,
+          "draw_wr": 0.5,
+          "share": 0.08339999999999999,
+          "games": 24
+        },
+        "Amber/Emerald Princess Aggro": {
+          "wr": 0.5,
+          "play_wr": 0.5833,
+          "draw_wr": 0.4167,
+          "share": 0.08159999999999999,
+          "games": 24
+        },
+        "Amethyst/Steel Midrange": {
+          "wr": 0.6667,
+          "play_wr": 0.9167,
+          "draw_wr": 0.4167,
+          "share": 0.06059999999999999,
+          "games": 24
+        }
+      },
+      "meta_wr": 0.53609659,
+      "one_drops": 19
+    }
+  },
+  "sample_openings": {
+    "Amber/Sapphire Detectives": true,
+    "Emerald/Steel Midrange": true,
+    "Amber/Emerald Circle of Life": true,
+    "Amber/Sapphire Control": true
+  }
+}

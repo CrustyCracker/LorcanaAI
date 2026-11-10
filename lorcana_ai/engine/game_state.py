@@ -132,6 +132,15 @@ class BoardEntity:
                     1 for e in owner.characters_in_play if "your characters with support get +1" in e.card.full_text.lower()
                 )
                 base += gadget_cnt
+            # Mickey Mouse - Amber Champion: "Your other Amber characters get +2 ◊."
+            if "Amber" in self.card.inks:
+                amber_champ_aura = sum(
+                    1
+                    for e in owner.characters_in_play
+                    if e.instance_id != self.instance_id
+                    and "your other amber characters get +2" in e.card.full_text.lower()
+                )
+                base += 2 * amber_champ_aura
         if opp is not None:
             # The Queen - Devious Disguise (Set 12): "While an opponent has more lore than you, this character gets +2 ◊."
             if owner is not None and "while an opponent has more lore than you, this character gets +2" in txt_lower:
@@ -171,11 +180,27 @@ class BoardEntity:
             return False
         return True
 
-    def can_sing(self, song_cost: int) -> bool:
+    def effective_singer_cost(self, owner: PlayerState | None = None) -> int:
+        """Printed Singer X, plus conditional Singer grants (e.g. Mickey Mouse - Amber Champion)."""
+        singer_val = self.card.abilities.singer_cost or self.card.cost
+        if owner is None:
+            return singer_val
+        txt = self.card.full_text.lower()
+        # Mickey Mouse - Amber Champion: "While you have 2 or more other Amber characters in play, this character gains Singer 8."
+        if "gains singer 8" in txt and "2 or more other amber characters" in txt:
+            other_amber = sum(
+                1
+                for e in owner.characters_in_play
+                if e.instance_id != self.instance_id and "Amber" in e.card.inks
+            )
+            if other_amber >= 2:
+                return max(singer_val, 8)
+        return singer_val
+
+    def can_sing(self, song_cost: int, owner: PlayerState | None = None) -> bool:
         if self.card.card_type != "Character" or self.exerted or self.drying:
             return False
-        singer_val = self.card.abilities.singer_cost or self.card.cost
-        return singer_val >= song_cost
+        return self.effective_singer_cost(owner) >= song_cost
 
     def clone(self) -> BoardEntity:
         return BoardEntity(

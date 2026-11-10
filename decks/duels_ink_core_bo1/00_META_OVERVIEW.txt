@@ -1,18 +1,26 @@
 =========================================================================================================
-DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14)
+DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14) | period=week:2026-11-08 (Nov 8 - 14, 2026)
 =========================================================================================================
 #   Archetyp                           Atrament           Mecze    Winrate  Meta Share   Plik talii
 ---------------------------------------------------------------------------------------------------------
- 1. Amber/Emerald Circle of Life      Amber/Emerald      13093    56.03%   21.28%       01_amber_emerald_circle_of_life.txt
- 2. Amber/Emerald Princess Aggro      Amber/Emerald      8072     53.91%   13.12%       02_amber_emerald_princess_aggro.txt
- 3. Amber/Sapphire Control            Amber/Sapphire     6940     49.37%   11.28%       03_amber_sapphire_control.txt
- 4. Amber/Sapphire Detectives         Amber/Sapphire     6829     54.21%   11.10%       04_amber_sapphire_detectives.txt
- 5. Emerald/Steel Midrange            Emerald/Steel      6439     58.35%   10.47%       05_emerald_steel_midrange.txt
- 6. Amethyst/Steel Midrange           Amethyst/Steel     6372     53.89%   10.36%       06_amethyst_steel_midrange.txt
- 7. Emerald/Sapphire Mouse House      Emerald/Sapphire   4146     49.64%    6.74%       07_emerald_sapphire_mouse_house.txt
- 8. Amber/Amethyst Midrange           Amber/Amethyst     2786     51.87%    4.53%       08_amber_amethyst_midrange.txt
- 9. Amethyst/Emerald Retro Device     Amethyst/Emerald   2140     49.77%    3.48%       09_amethyst_emerald_retro_device.txt
-10. Amber/Ruby Leviathan Circle       Amber/Ruby         1879     45.72%    3.05%       10_amber_ruby_leviathan_circle.txt
-11. Amber/Amethyst Aggro              Amber/Amethyst     1440     52.50%    2.34%       11_amber_amethyst_aggro.txt
-12. Amber/Steel Lilo & Stitch Songs   Amber/Steel        1378     49.35%    2.24%       12_amber_steel_lilo_stitch_songs.txt
+ 1. Amber/Sapphire Detectives         Amber/Sapphire     7642     53.14%   15.13%       01_amber_sapphire_detectives.txt
+ 2. Emerald/Steel Midrange            Emerald/Steel      6886     53.01%   13.64%       02_emerald_steel_midrange.txt
+ 3. Amber/Emerald Circle of Life      Amber/Emerald      5216     49.64%   10.33%       03_amber_emerald_circle_of_life.txt
+ 4. Amber/Sapphire Control            Amber/Sapphire     3537     48.94%    7.00%       04_amber_sapphire_control.txt
+ 5. Amethyst/Emerald Retro Device     Amethyst/Emerald   3436     49.51%    6.80%       05_amethyst_emerald_retro_device.txt
+ 6. Amethyst/Ruby Midrange            Amethyst/Ruby      2876     51.18%    5.70%       06_amethyst_ruby_midrange.txt
+ 7. Amber/Emerald Princess Aggro      Amber/Emerald      2815     54.78%    5.57%       07_amber_emerald_princess_aggro.txt
+ 8. Amethyst/Steel Midrange           Amethyst/Steel     2090     52.82%    4.14%       08_amethyst_steel_midrange.txt
+ 9. Emerald/Sapphire Mouse House      Emerald/Sapphire   1761     51.16%    3.49%       09_emerald_sapphire_mouse_house.txt
+10. Amber/Amethyst Aggro              Amber/Amethyst     1758     53.24%    3.48%       10_amber_amethyst_aggro.txt
+11. Emerald/Steel Touch Paradise      Emerald/Steel      1699     52.62%    3.36%       11_emerald_steel_touch_paradise.txt
+12. Amber/Amethyst                    Amber/Amethyst     1597     52.54%    3.16%       12_amber_amethyst.txt
+13. Amber/Steel Rockstar Aggro        Amber/Steel        1535     55.11%    3.04%       13_amber_steel_rockstar_aggro.txt
+14. Emerald/Ruby Ruby R.E.D.          Emerald/Ruby       1393     44.80%    2.76%       14_emerald_ruby_ruby_r_e_d.txt
+15. Amber/Amethyst Midrange           Amber/Amethyst     1314     50.15%    2.60%       15_amber_amethyst_midrange.txt
+16. Amber/Amethyst Remember Merida    Amber/Amethyst     1293     50.19%    2.56%       16_amber_amethyst_remember_merida.txt
+17. Sapphire/Steel Big Ramp           Sapphire/Steel     1185     50.46%    2.35%       17_sapphire_steel_big_ramp.txt
+18. Amber/Steel Lilo & Stitch Songs   Amber/Steel        1032     50.87%    2.04%       18_amber_steel_lilo_stitch_songs.txt
+19. Amber/Ruby Candle Control         Amber/Ruby         888      45.72%    1.76%       19_amber_ruby_candle_control.txt
+20. Emerald/Ruby Action Retro         Emerald/Ruby       542      46.13%    1.07%       20_emerald_ruby_action_retro.txt
 =========================================================================================================

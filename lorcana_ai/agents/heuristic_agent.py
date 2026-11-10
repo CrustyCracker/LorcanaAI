@@ -784,6 +784,26 @@ class TacticalHeuristicAgent:
                     bonus += 3.5
                 if card.abilities.has_underdog and state.turn_number == 2:
                     bonus += 5.0
+                # Mickey Mouse - Amber Champion: +2 lore aura to other Amber characters — deploy when board is Amber-wide
+                if "your other amber characters get +2" in card_lower:
+                    other_amber_board = sum(
+                        1 for e in p.characters_in_play if "Amber" in e.card.inks
+                    )
+                    other_amber_hand = sum(
+                        1
+                        for i, c in enumerate(p.hand)
+                        if i != action.hand_index and c.card_type == "Character" and "Amber" in c.inks
+                    )
+                    if other_amber_board + other_amber_hand >= 2:
+                        bonus += 8.0 + other_amber_board * 3.0
+                    else:
+                        bonus -= 2.0
+                # Prefer questing after Amber Champion is down so +2 lore applies this turn
+                if any(
+                    "your other amber characters get +2" in e.card.full_text.lower()
+                    for e in p.characters_in_play
+                ) and "Amber" in card.inks:
+                    bonus += 2.5
                 if EffectOpType.DISCOUNT_NEXT_CHAR in ops:
                     my_eff_cost = p.effective_play_cost(card, is_second_player_first_turn=(state.turn_number == 2 and state.active_player != state.starting_player))
                     rem_ink = p.total_payable_ink - my_eff_cost

@@ -111,11 +111,11 @@ class LorcanaSimulator:
                     accum = 0
                     ready_singers = sorted(
                         [e for e in p.characters_in_play if not e.exerted and not e.drying],
-                        key=lambda e: (e.effective_lore(p, opp), -(e.card.abilities.singer_cost or e.card.cost)),
+                        key=lambda e: (e.effective_lore(p, opp), -e.effective_singer_cost(p)),
                     )
                     for ent in ready_singers:
                         ent.exerted = True
-                        accum += ent.card.abilities.singer_cost or ent.card.cost
+                        accum += ent.effective_singer_cost(p)
                         if accum >= needed:
                             break
                 else:

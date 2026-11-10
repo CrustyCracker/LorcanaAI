@@ -71,9 +71,15 @@ def cmd_sync_cards(_args: argparse.Namespace) -> None:
 
 
 def cmd_sync_meta(args: argparse.Namespace) -> None:
+    from lorcana_ai.data.meta_decks import _resolve_duels_ink_period
+
     dedup = not getattr(args, "include_variants", False)
     top_n = getattr(args, "top_n", 15)
-    print(f"[LorcanaAlpha] Pobieranie metagry Core Set 14 z https://duels.ink/stats/{args.queue} ...")
+    resolved_period = _resolve_duels_ink_period(args.period, era=args.era, queue=args.queue)
+    print(
+        f"[LorcanaAlpha] Pobieranie metagry Core Set 14 z https://duels.ink/stats/{args.queue} "
+        f"(period={args.period} -> {resolved_period}) ..."
+    )
     profiles = sync_duels_ink_meta(
         queue=args.queue,
         period=args.period,
@@ -83,7 +89,10 @@ def cmd_sync_meta(args: argparse.Namespace) -> None:
         deduplicate_by_name=dedup,
     )
     print("\n" + "=" * 105)
-    print(f"ZESKREJPOWANE TALIE METAGRY DUELS.INK ({args.queue.upper()} | Era: {args.era} | Okres: {args.period}) — TOP {len(profiles)} ARCHETYPÓW")
+    print(
+        f"ZESKREJPOWANE TALIE METAGRY DUELS.INK ({args.queue.upper()} | Era: {args.era} | "
+        f"Okres: {resolved_period}) — TOP {len(profiles)} ARCHETYPÓW"
+    )
     print("=" * 105)
     out_dir = PROJECT_ROOT / "decks" / f"duels_ink_{args.queue.replace('-', '_')}"
     for idx, prof in enumerate(profiles, 1):
@@ -495,7 +504,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_meta = sub.add_parser("sync-meta", help="Scrape Core Set 14 meta decks and stats from https://duels.ink/stats/core-bo1")
     p_meta.add_argument("--queue", type=str, default="core-bo1", help="Duels.ink queue ID (e.g. core-bo1, core-bo3)")
-    p_meta.add_argument("--period", type=str, default="all_time", help="Time period (all_time or week)")
+    p_meta.add_argument(
+        "--period",
+        type=str,
+        default="all_time",
+        help="Time period: all_time, week / current_week (resolves to week:YYYY-MM-DD), or week:YYYY-MM-DD",
+    )
     p_meta.add_argument("--era", type=str, default="set14", help="Era identifier (default: set14)")
     p_meta.add_argument("--top-n", type=int, default=15, help="Liczba unikalnych archetypów metagry do pobrania (domyślnie: 15)")
     p_meta.add_argument("--include-variants", action="store_true", help="Pobieraj również warianty centroidów (v2, v3) zamiast deduplikacji")

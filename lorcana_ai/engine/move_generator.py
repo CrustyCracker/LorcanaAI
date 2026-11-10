@@ -105,7 +105,7 @@ class MoveGenerator:
 
         # 3. Play cards from hand / Shift (all 6 variants, CR Rule 8.10.8) / Sing Songs (CR Rule 8.11 & 8.12)
         ready_dry_chars = [e for e in p.characters_in_play if not e.exerted and not e.drying]
-        total_chorus_power = sum((e.card.abilities.singer_cost or e.card.cost) for e in ready_dry_chars)
+        total_chorus_power = sum(e.effective_singer_cost(p) for e in ready_dry_chars)
         is_p2_first_turn = (state.turn_number == 2 and state.active_player != state.starting_player)
         has_char_in_discard = any(c.card_type == "Character" for c in p.discard)
 
@@ -214,7 +214,7 @@ class MoveGenerator:
                         )
                     )
                 for ent in ready_dry_chars:
-                    if ent.can_sing(card.cost):
+                    if ent.can_sing(card.cost, owner=p):
                         actions.append(
                             GameAction(
                                 action_type=ActionType.SING_SONG,

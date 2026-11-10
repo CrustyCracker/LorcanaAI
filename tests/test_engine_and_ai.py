@@ -453,6 +453,36 @@ class TestEngineAndAI(unittest.TestCase):
         self.assertEqual(best_brick.action_type, ActionType.MULLIGAN)
         self.assertEqual(sum(best_brick.mulligan_keep_mask), 0)
 
+    def test_mickey_amber_champion_lore_aura_and_singer(self) -> None:
+        """Mickey Mouse - Amber Champion: +2 lore to other Amber chars; Singer 8 with 2+ other Amber."""
+        champ = GLOBAL_CARD_DB.get_by_name("Mickey Mouse - Amber Champion")
+        thomas = GLOBAL_CARD_DB.get_by_name("Thomas - Wide-Eyed Recruit")  # Amber 0/4/1
+        ursula = GLOBAL_CARD_DB.get_by_name("Ursula - Deceiver")  # Emerald — no Amber aura
+        assert champ and thomas and ursula
+
+        deck = [champ] * 20 + [thomas] * 20 + [ursula] * 20
+        state = GameState.create_new_game(deck, deck, starting_player=0, seed=3)
+        p0 = state.players[0]
+        p0.board.clear()
+        champ_ent = BoardEntity(instance_id=1, card=champ, exerted=False, drying=False, damage=0)
+        thomas_ent = BoardEntity(instance_id=2, card=thomas, exerted=False, drying=False, damage=0)
+        ursula_ent = BoardEntity(instance_id=3, card=ursula, exerted=False, drying=False, damage=0)
+        p0.board = [champ_ent, thomas_ent, ursula_ent]
+
+        self.assertEqual(thomas.lore, 1)
+        self.assertEqual(thomas_ent.effective_lore(p0, state.players[1]), 3)  # +2 from Champion
+        self.assertEqual(ursula_ent.effective_lore(p0, state.players[1]), ursula.lore)  # Emerald: no aura
+        self.assertEqual(champ_ent.effective_lore(p0, state.players[1]), champ.lore)  # self not buffed
+
+        # Only 1 other Amber (Thomas) -> no Singer 8 yet
+        self.assertEqual(champ_ent.effective_singer_cost(p0), champ.cost)
+        # Add second Amber ally
+        aurora = GLOBAL_CARD_DB.get_by_name("Aurora - Holding Court")
+        assert aurora is not None
+        p0.board.append(BoardEntity(instance_id=4, card=aurora, exerted=False, drying=False, damage=0))
+        self.assertEqual(champ_ent.effective_singer_cost(p0), 8)
+        self.assertTrue(champ_ent.can_sing(8, owner=p0))
+
 
 if __name__ == "__main__":
     unittest.main()

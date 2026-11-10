@@ -1,0 +1,25 @@
+# Amber/Ruby Candle Control (Amber/Ruby)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1b9db-ea45-7e54-a359-a6495ad6f377)
+# Games Played: 888 | Win Rate: 45.72% | Meta Share: 1.76%
+# Signature Cards: Though I Have to Say Goodbye, Liquidator - Iced Over, Olaf - Snowman of Action
+4 Dangerous Plan
+4 Inner Strength
+4 Rivera Family Photo
+2 Hercules - Young Rescuer
+1 Intimidation Tactics
+3 Jebidiah Farnsworth - Cookie
+4 Liquidator - Iced Over
+4 Though I Have to Say Goodbye
+2 Firefly Swarm
+1 Or Rewrite History!
+3 Roller Bob - Sid's Toy
+3 The Horseman Strikes!
+4 The Torn Corner
+2 Land of the Dead - Marigold Bridge
+4 Red Alert
+3 Sulley - The New Boss
+1 Copper - On the Scent
+2 Remember Me
+1 Sulley & Boo - Scare Buddies
+4 Raging Storm
+4 Olaf - Snowman of Action

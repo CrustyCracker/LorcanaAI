@@ -284,9 +284,13 @@ class EffectDSLCompiler:
         if m_st:
             abilities.sing_together_cost = int(m_st.group(1))
 
-        m_singer = cls._RE_SINGER.search(text)
-        if m_singer:
-            abilities.singer_cost = int(m_singer.group(1))
+        # Native Singer X (with reminder paren), NOT conditional "gains Singer X" (e.g. Mickey Mouse - Amber Champion)
+        m_native_singer = re.search(r"(?<!gains\s)\bSinger\s+(\d+)\s*\(", text, re.IGNORECASE)
+        m_singer_plain = cls._RE_SINGER.search(text)
+        if m_native_singer:
+            abilities.singer_cost = int(m_native_singer.group(1))
+        elif m_singer_plain and "gains singer" not in lower:
+            abilities.singer_cost = int(m_singer_plain.group(1))
         elif card_type == "Character":
             abilities.singer_cost = cost
 

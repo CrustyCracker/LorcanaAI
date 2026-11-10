@@ -1160,6 +1160,8 @@ class TechCardScanner:
             "Pluto - Friendly Pooch": 35.0,
             "Nani - Stage Manager": 34.5,
             "David - Protective Snowboarder": 34.0,
+            "Mickey Mouse - Amber Champion": 33.5,
+            "Mickey Mouse - Best in Town": 32.5,
             "Rapunzel - Tower Defender": 31.5,
             "Monterey Jack - Hypnotized by Cheese": 31.0,
             "Percy - Pupsicle": 30.5,

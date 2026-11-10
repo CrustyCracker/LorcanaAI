@@ -54,6 +54,38 @@ def _build_set_num_to_fullname_map() -> dict[str, str]:
     return mapping
 
 
+def _resolve_duels_ink_period(period: str, era: str = "set14", queue: str = "core-bo1", timeout: int = 20) -> str:
+    """
+    Normalize CLI period aliases to Duels.ink API values.
+    Bare `week` (and `current_week`) resolve to `week:YYYY-MM-DD` using meta.currentWeek.startDate.
+    """
+    period = (period or "all_time").strip()
+    if period not in {"week", "current_week"}:
+        return period
+
+    import urllib.parse
+    import urllib.request
+
+    # Probe with period=week to read currentWeek from the response meta block.
+    query = urllib.parse.urlencode({"queue": queue, "period": "week", "era": era})
+    req = urllib.request.Request(
+        f"{DUELS_INK_META_API}?{query}",
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LorcanaAlpha/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        probe = json.loads(resp.read().decode("utf-8"))
+    current = (probe.get("meta") or {}).get("currentWeek") or {}
+    start = current.get("startDate")
+    if start:
+        return f"week:{start}"
+    weeks = (probe.get("meta") or {}).get("availableWeeks") or []
+    if weeks:
+        start = weeks[-1].get("startDate")
+        if start:
+            return f"week:{start}"
+    return period
+
+
 def sync_duels_ink_meta(
     queue: str = "core-bo1",
     period: str = "all_time",
@@ -71,7 +103,8 @@ def sync_duels_ink_meta(
     import urllib.parse
     import urllib.request
 
-    query = urllib.parse.urlencode({"queue": queue, "period": period, "era": era})
+    resolved_period = _resolve_duels_ink_period(period, era=era, queue=queue, timeout=timeout)
+    query = urllib.parse.urlencode({"queue": queue, "period": resolved_period, "era": era})
     req = urllib.request.Request(
         f"{DUELS_INK_META_API}?{query}",
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LorcanaAlpha/1.0"},
@@ -109,9 +142,21 @@ def export_profiles_to_txt(
                 pass
 
     written: list[Path] = []
+    period_label = ""
+    try:
+        cache_meta = json.loads(DUELS_INK_CACHE_FILE.read_text(encoding="utf-8")).get("meta", {})
+        period_label = str(cache_meta.get("period") or "")
+        cw = cache_meta.get("currentWeek") or {}
+        if period_label.startswith("week:") and cw.get("label"):
+            period_label = f"{period_label} ({cw.get('label')})"
+    except Exception:
+        period_label = ""
+    header = "DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14)"
+    if period_label:
+        header = f"{header} | period={period_label}"
     summary_lines = [
         "=" * 105,
-        "DUELS.INK META DECKS OVERVIEW (CORE CONSTRUCTED SET 14)",
+        header,
         "=" * 105,
         f"{'#':<3} {'Archetyp':<34} {'Atrament':<18} {'Mecze':<8} {'Winrate':<8} {'Meta Share':<12} {'Plik talii'}",
         "-" * 105,
