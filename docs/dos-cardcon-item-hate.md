@@ -5,18 +5,21 @@
 ## Zakres danych
 
 - **Field size (gracze):** 219
-- **Opublikowane decklisty na inkDecks:** 200
-- **Decklisty przeanalizowane:** 200 / 200
+- **Opublikowane decklisty na inkDecks:** 199
+- **Decklisty przeanalizowane:** 199 / 199
 - **Definicja item hate/tech:** (1) karty, których tekst celuje w itemy przeciwnika (banish / return / inkwell / lock / tax); (2) **discard z ręki kart non-character** (item/akcja/lokacja w ręce) — m.in. **Mowgli - Man Cub**, **Elisa Maza - Hardworking Detective** oraz inne efekty „reveal hand → discard non-character”. Wykluczone: synergie „gdy grasz item” oraz efekty kosztujące banish własnego itemu.
+- **Matchowanie:** wyłącznie pełna nazwa + subtitle/version (np. `Aladdin - Doing His Part`), nigdy sam base name (`Aladdin` / `Mowgli`). Inne warianty w talii nie liczą się jako item hate.
+- **Invariant:** max 4 kopie tej samej karty (full name + version) na talię — raport nie pokazuje >4.
 
 ## Podsumowanie
 
-- Gracze z ≥1 kartą item hate: **116 / 200** list (~58%)
-- Najwięcej adoption: **Aladdin - Doing His Part** (42 talii / 95 kopii, avg 2.3), **Mowgli - Man Cub** (37 talii / 90 kopii, avg 2.4), **Elisa Maza - Hardworking Detective** (30 talii / 114 kopii, avg 3.8)
+- Gracze z ≥1 kartą item hate: **116 / 199** list (~58%)
+- Najwięcej adoption: **Aladdin - Doing His Part** (42 talii / 95 kopii, avg 2.3), **Mowgli - Man Cub** (37 talii / 86 kopii, avg 2.3), **Elisa Maza - Hardworking Detective** (30 talii / 114 kopii, avg 3.8)
 - **Hand discard (non-character) w fieldzie:**
-  - Mowgli - Man Cub: 37 talii / 90 kopii (avg 2.4)
+  - Mowgli - Man Cub: 37 talii / 86 kopii (avg 2.3)
   - Elisa Maza - Hardworking Detective: 30 talii / 114 kopii (avg 3.8)
   - Timon - Snowball Swiper: 1 talii / 2 kopii (avg 2)
+- **Weryfikacja DKP:** inkDecks (`One more time` / deck 529870) i Lorcanahunter (player/200789, live) zgodnie pokazują legalną talię Amber/Amethyst z **4× Mowgli - Man Cub**. Wcześniejsze **8×** w raporcie to był double-count stray `test.html` (ta sama lista policzona dwa razy) — po fixie max u DKP to 4, nie 0. Claim „DKP grał 0 Mowgli” **nie potwierdza się** w opublikowanych decklistach.
 
 ## Ranking kart (adoption / copies)
 
@@ -25,7 +28,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | Karta | Tekst (skrót) | Typ | Decks | Copies | Avg (gdy grana) |
 |---|---|---|---:|---:|---:|
 | Aladdin - Doing His Part | CLEAR IT OUT When you play this character, you may pay 1 {I} to banish chosen item. | board item | 42 | 95 | 2.3 |
-| Mowgli - Man Cub | HAVE A BETTER LOOK When you play this character, chosen opponent reveals their hand and d… | hand discard | 37 | 90 | 2.4 |
+| Mowgli - Man Cub | HAVE A BETTER LOOK When you play this character, chosen opponent reveals their hand and d… | hand discard | 37 | 86 | 2.3 |
 | Elisa Maza - Hardworking Detective | FOLLOW THE TRAIL When you play this character, if you have another Detective character in… | hand discard | 30 | 114 | 3.8 |
 | Judy Hopps - On the Case | HIDDEN CLUES When you play this character, if you have another Detective character in pla… | board item | 28 | 75 | 2.7 |
 | Wildcat - Unconventional Mechanic | WELL, THAT'S BROKEN When you play this character, you may banish chosen item. | board item | 17 | 30 | 1.8 |
@@ -52,7 +55,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
-| Darkwings | Tommydo0 | 4 | inkdecks |
+| Darkwings ¦ Tommydo0 | 4 | inkdecks |
 | HakunaMetata | 4 | inkdecks |
 | LB_Dekkerboy | 4 | inkdecks |
 | Team_OIaf_Robin | 4 | inkdecks |
@@ -61,7 +64,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | AWNM_Julian.S | 3 | inkdecks |
 | AWNM_Stephanie | 3 | inkdecks |
 | BeepBoopVla | 3 | inkdecks |
-| COI | MVPi | 3 | inkdecks |
+| COI ¦ MVPi | 3 | inkdecks |
 | D15CU55 | 3 | inkdecks |
 | Daniel S | 3 | inkdecks |
 | Hot&Spicy | 3 | inkdecks |
@@ -70,7 +73,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | Sunredy | 3 | inkdecks |
 | TT_Flurry | 3 | inkdecks |
 | WieS1 BnS | 3 | inkdecks |
-| DarkWings | Juggy | 2 | inkdecks |
+| DarkWings ¦ Juggy | 2 | inkdecks |
 | EricvH | 2 | inkdecks |
 | FloriansJade | 2 | inkdecks |
 | HLC_Robin | 2 | inkdecks |
@@ -90,8 +93,8 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | OneL_MoTo | 1 | inkdecks |
 | P&A_Michiel | 1 | inkdecks |
 | PatH90 | 1 | inkdecks |
-| TCB | Lianne 🐒 | 1 | inkdecks |
-| TCB | WhiteWarlock | 1 | inkdecks |
+| TCB ¦ Lianne 🐒 | 1 | inkdecks |
+| TCB ¦ WhiteWarlock | 1 | inkdecks |
 | Tunabowl | 1 | inkdecks |
 | Valentijn S. | 1 | inkdecks |
 
@@ -100,14 +103,14 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 - **Koszt:** 2
 - **Tekst:** HAVE A BETTER LOOK When you play this character, chosen opponent reveals their hand and discards a non-character card of their choice.
 - **Kategoria:** hand discard (non-character)
-- **Suma kopii:** 90
+- **Suma kopii:** 86
 - **Liczba talii/graczy:** 37
-- **Średnio kopii (gdy grana):** 2.4
+- **Średnio kopii (gdy grana):** 2.3
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
-| DKP | 8 | inkdecks |
-| GOAT | Nayro | 4 | inkdecks |
+| DKP | 4 | inkdecks |
+| GOAT ¦ Nayro | 4 | inkdecks |
 | JeroenK | 4 | inkdecks |
 | SadZe | 4 | inkdecks |
 | AWNM_Wesley | 3 | inkdecks |
@@ -117,13 +120,13 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | RYAN | 3 | inkdecks |
 | TT_Egelim | 3 | inkdecks |
 | Yoran | 3 | inkdecks |
-| 𝐄𝐈 | CrashTheWolf | 3 | inkdecks |
+| 𝐄𝐈 ¦ CrashTheWolf | 3 | inkdecks |
 | [M7] Czaro | 2 | inkdecks |
 | Brenda | 2 | inkdecks |
 | degerino | 2 | inkdecks |
 | Foefighter | 2 | inkdecks |
 | Go Ink Yourself - Jayme | 2 | inkdecks |
-| GOAT | Conny | 2 | inkdecks |
+| GOAT ¦ Conny | 2 | inkdecks |
 | Grunner86 | 2 | inkdecks |
 | KdB | 2 | inkdecks |
 | L&O PamK | 2 | inkdecks |
@@ -131,16 +134,16 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | P&A_Michael | 2 | inkdecks |
 | PD_Ntx | 2 | inkdecks |
 | Sanne | 2 | inkdecks |
-| TCG | RedbeardTjeerd 🧞‍♂️ | 2 | inkdecks |
+| TCG ¦ RedbeardTjeerd 🧞‍♂️ | 2 | inkdecks |
 | Tina | 2 | inkdecks |
 | TT_CuddlesomeTiger | 2 | inkdecks |
 | TT_Makoya | 2 | inkdecks |
 | TT_Naasty | 2 | inkdecks |
 | VforV93 | 2 | inkdecks |
-| 𝐄𝐈 | Mglor | 2 | inkdecks |
-| 𝐄𝐈 | MichaelNL | 2 | inkdecks |
+| 𝐄𝐈 ¦ Mglor | 2 | inkdecks |
+| 𝐄𝐈 ¦ MichaelNL | 2 | inkdecks |
 | LB_Menski | 1 | inkdecks |
-| MI | Dustin | 1 | inkdecks |
+| MI ¦ Dustin | 1 | inkdecks |
 | Mooteman | 1 | inkdecks |
 | RR_Reyem | 1 | inkdecks |
 
@@ -165,7 +168,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | JeNeVer [ILLUMITREES] | 4 | inkdecks |
 | Judith | 4 | inkdecks |
 | Karibor1 | 4 | inkdecks |
-| MI | Dustin | 4 | inkdecks |
+| MI ¦ Dustin | 4 | inkdecks |
 | Mooteman | 4 | inkdecks |
 | OneL_Vortex | 4 | inkdecks |
 | P&A_Michael | 4 | inkdecks |
@@ -178,12 +181,12 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | TT_Makoya | 4 | inkdecks |
 | VforV93 | 4 | inkdecks |
 | Zoë Strawberriez | 4 | inkdecks |
-| 𝐄𝐈 | Fernanda ✨ | 4 | inkdecks |
-| 𝐄𝐈 | MichaelNL | 4 | inkdecks |
+| 𝐄𝐈 ¦ Fernanda ✨ | 4 | inkdecks |
+| 𝐄𝐈 ¦ MichaelNL | 4 | inkdecks |
 | [LF] DavSong | 3 | inkdecks |
 | Foefighter | 3 | inkdecks |
-| GOAT | Nayro | 3 | inkdecks |
-| 𝐄𝐈 | CrashTheWolf | 3 | inkdecks |
+| GOAT ¦ Nayro | 3 | inkdecks |
+| 𝐄𝐈 ¦ CrashTheWolf | 3 | inkdecks |
 | RYAN | 2 | inkdecks |
 
 ### Judy Hopps - On the Case
@@ -200,7 +203,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | Brenda | 4 | inkdecks |
 | Foefighter | 4 | inkdecks |
 | JeNeVer [ILLUMITREES] | 4 | inkdecks |
-| MI | Dustin | 4 | inkdecks |
+| MI ¦ Dustin | 4 | inkdecks |
 | Mooteman | 4 | inkdecks |
 | P&A_Michael | 4 | inkdecks |
 | Zoë Strawberriez | 4 | inkdecks |
@@ -209,8 +212,8 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | Sanne | 3 | inkdecks |
 | TT_Makoya | 3 | inkdecks |
 | VforV93 | 3 | inkdecks |
-| 𝐄𝐈 | Fernanda ✨ | 3 | inkdecks |
-| 𝐄𝐈 | MichaelNL | 3 | inkdecks |
+| 𝐄𝐈 ¦ Fernanda ✨ | 3 | inkdecks |
+| 𝐄𝐈 ¦ MichaelNL | 3 | inkdecks |
 | - Case of the Missing Wins by Agim88 | 2 | inkdecks |
 | [LF] DavSong | 2 | inkdecks |
 | AWNM_Wesley | 2 | inkdecks |
@@ -222,7 +225,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | RR_Reyem | 2 | inkdecks |
 | Team_Olaf_Sander ☃️ | 2 | inkdecks |
 | TT_CuddlesomeTiger | 2 | inkdecks |
-| 𝐄𝐈 | CrashTheWolf | 2 | inkdecks |
+| 𝐄𝐈 ¦ CrashTheWolf | 2 | inkdecks |
 | Judith | 1 | inkdecks |
 | RYAN | 1 | inkdecks |
 
@@ -237,14 +240,14 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 
 | Gracz | Kopie | Źródło listy |
 |---|---:|---|
-| COI | duesentrieb | 3 | inkdecks |
+| COI ¦ duesentrieb | 3 | inkdecks |
 | P&A_ B100 | 3 | inkdecks |
 | aKi | 2 | inkdecks |
-| GOAT | Blub | 2 | inkdecks |
-| GOAT | Nupsi | 2 | inkdecks |
+| GOAT ¦ Blub | 2 | inkdecks |
+| GOAT ¦ Nupsi | 2 | inkdecks |
 | Hufrey | 2 | inkdecks |
-| LSA | Geek Inside | 2 | inkdecks |
-| LSA | LoreGoat 🐐 | 2 | inkdecks |
+| LSA ¦ Geek Inside | 2 | inkdecks |
+| LSA ¦ LoreGoat 🐐 | 2 | inkdecks |
 | PatH90 | 2 | inkdecks |
 | Robert | 2 | inkdecks |
 | Sammie | 2 | inkdecks |
@@ -253,7 +256,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 | Alexander (ILLUMITREES) | 1 | inkdecks |
 | Chrisa | 1 | inkdecks |
 | MoreLorePls | 1 | inkdecks |
-| TCB | MisterT | 1 | inkdecks |
+| TCB ¦ MisterT | 1 | inkdecks |
 
 ### Vincenzo Santorini - On the Run
 
@@ -268,7 +271,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 |---|---:|---|
 | Edwin | 3 | inkdecks |
 | Calemor | 2 | inkdecks |
-| L&O | Viindex | 2 | inkdecks |
+| L&O ¦ Viindex | 2 | inkdecks |
 | OneL_keizo 🦊 | 2 | inkdecks |
 | [LF] Ekkox | 1 | inkdecks |
 
@@ -540,3 +543,7 @@ _Avg (gdy grana)_ = średnia liczba kopii tylko wśród talii, które już graj�
 - Wasabi - Methodical Engineer [board_item] — BLADES OF FURY When you play this character, you may banish chosen item. Its player gains 1 lore. QUICK REFLEXES During your turn, this cha…
 - We've Got a Lot to Do! [board_item] — (A character with cost 3 or more can {E} to sing this song for free.) Put chosen item or location into its player's inkwell facedown and ex…
 - Wreck-It Ralph - Ham Hands [board_item] — I WRECK THINGS Whenever this character quests, you may banish chosen item or location to gain 2 lore.
+
+## Warianty tej samej nazwy bazowej w fieldzie (NIE liczone jako item hate)
+
+- Aladdin - Barreling Through — 2 talii (odrzucone: brak dokładnego matcha full name + version w katalogu hate)
