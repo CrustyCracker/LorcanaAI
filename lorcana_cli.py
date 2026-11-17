@@ -35,7 +35,9 @@ from lorcana_ai.data.meta_decks import (
     get_reference_meta_decks,
     sync_duels_ink_meta,
 )
+from lorcana_ai.deckbuilder.core_ablation import run_core_value_ablation, write_ablation_json
 from lorcana_ai.deckbuilder.evolutionary_map import MAPElitesDeckbuilder
+from lorcana_ai.deckbuilder.matchup_evaluator import MatchupEvaluator
 from lorcana_ai.deckbuilder.nash_solver import NashMetaSolver
 from lorcana_ai.deckbuilder.tech_scanner import TechCardScanner
 from lorcana_ai.engine.simulator import HAS_RUST_ENGINE
@@ -120,8 +122,14 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     flex_slots = max(0, 60 - locked_total)
     workers_arg = getattr(args, "workers", 0)
     lookahead_depth = getattr(args, "lookahead_depth", 1)
+    workers = workers_arg if workers_arg > 0 else None
     scanner = TechCardScanner(
-        workers=workers_arg if workers_arg > 0 else None,
+        evaluator=MatchupEvaluator(
+            use_full_dsl_sim=True,
+            workers=workers,
+            lookahead_depth=lookahead_depth,
+        ),
+        workers=workers,
         lookahead_depth=lookahead_depth,
     )
     est_decks = (15 if "princess" in args.archetype.lower() else 13) + args.packages
@@ -356,9 +364,12 @@ def cmd_scan_tech(args: argparse.Namespace) -> None:
         list(decks.values())[1],
     )
 
-    print(f"[LorcanaAlpha] Scanning Tech-Cards for '{my_deck.name}' vs '{opp_deck.name}'...")
+    print(f"[LorcanaAlpha] Scanning Tech-Cards for '{my_deck.name}' vs '{opp_deck.name}' (Python DSL)...")
     lookahead_depth = getattr(args, "lookahead_depth", 1)
-    scanner = TechCardScanner(lookahead_depth=lookahead_depth)
+    scanner = TechCardScanner(
+        evaluator=MatchupEvaluator(use_full_dsl_sim=True, lookahead_depth=lookahead_depth),
+        lookahead_depth=lookahead_depth,
+    )
     recs = scanner.scan_for_matchup(
         base_deck=my_deck,
         opponent_deck=opp_deck,
@@ -571,6 +582,122 @@ def cmd_nash_meta(args: argparse.Namespace) -> None:
     print("=" * 95)
 
 
+def cmd_core_ablate(args: argparse.Namespace) -> None:
+    """Leave-one-out CoreValue (−1 copy) vs Duels.ink meta gauntlet (Python DSL only)."""
+    if getattr(args, "vs_meta", "cache") == "week":
+        print("[LorcanaAlpha] Odświeżanie metagry Duels.ink (period=week)...")
+        sync_duels_ink_meta(period="week", top_n=max(8, args.top_meta), export_txt_files=True)
+
+    full_deck = _resolve_deck_spec(args.deck)
+    if args.core_deck and Path(args.core_deck).exists():
+        core_deck = Deck.from_dreamborn_text(
+            Path(args.core_deck).read_text(encoding="utf-8"),
+            name=f"{full_deck.name} (Core)",
+        )
+        core_counts = dict(core_deck.card_counts)
+    else:
+        core_counts, _ = get_archetype_core_and_baseline(full_deck.name)
+        if not core_counts:
+            core_counts = dict(full_deck.card_counts)
+
+    meta_decks = get_reference_meta_decks(top_n=args.top_meta)
+    meta_shares = get_metagame_shares(top_n=args.top_meta)
+    workers = args.workers if args.workers > 0 else None
+    print(
+        f"[LorcanaAlpha] CoreValue ablation (−1 copy) for '{full_deck.name}' | "
+        f"core={sum(core_counts.values())} flex={max(0, 60 - sum(core_counts.values()))} | "
+        f"vs top {len(meta_decks)} meta | games/MU={args.games} | DSL sim=True"
+    )
+    report = run_core_value_ablation(
+        full_deck=full_deck,
+        core_card_counts=core_counts,
+        meta_decks=meta_decks,
+        meta_shares=meta_shares,
+        games_per_matchup=args.games,
+        seed=args.seed,
+        workers=workers,
+        lookahead_depth=args.lookahead_depth,
+        replace_card_name=args.replace or None,
+    )
+
+    print("\n" + "=" * 105)
+    print(f"COREVALUE ABLATION (−1 COPY) — najsłabsze karty rdzenia najpierw: {report.deck_name}")
+    print(
+        f"Baseline meta BO1={report.baseline_bo1*100:.1f}% | BO3={report.baseline_bo3*100:.1f}% | "
+        f"N={report.core_card_count} core / {report.flex_slots} flex"
+        + (f" | replace={report.replace_card}" if report.replace_card else " | mode=59-card")
+    )
+    print("=" * 105)
+    print(f"{'#':<3} {'Karta':<42} {'x':>2} {'ΔBO1':>8} {'ΔBO3':>8} {'Abl BO3':>8}")
+    print("-" * 105)
+    for idx, row in enumerate(report.rows, 1):
+        s1 = "+" if row.delta_bo1 >= 0 else ""
+        s3 = "+" if row.delta_bo3 >= 0 else ""
+        print(
+            f"{idx:<3} {row.card_name:<42} {row.copies_in_core:>2} "
+            f"{s1}{row.delta_bo1*100:>6.1f}% {s3}{row.delta_bo3*100:>6.1f}% {row.ablated_bo3*100:>7.1f}%"
+        )
+    print("=" * 105)
+    print("Interpretacja: najwyższy ΔBO3 = najsłabsza karta rdzenia (usunięcie najmniej szkodzi / pomaga).")
+    print("Najniższy (najbardziej ujemny) ΔBO3 = najmocniejsza karta rdzenia.")
+
+    out_path = RESULTS_DIR / "core_ablation_report.json"
+    write_ablation_json(report, out_path)
+    print(f"[OK] Zapisano raport JSON: {out_path}")
+
+
+def cmd_ismcts_spotcheck(args: argparse.Namespace) -> None:
+    """Tiny IS-MCTS play spotcheck for a matchup or Top-K tech JSON (not for rankings)."""
+    from lorcana_ai.deckbuilder.ismcts_spotcheck import spotcheck_matchup, spotcheck_top_k_from_json
+
+    deck_a = _resolve_deck_spec(args.deck_a)
+    deck_b = _resolve_deck_spec(args.deck_b)
+    if args.tech_json and Path(args.tech_json).exists():
+        print(
+            f"[LorcanaAlpha] IS-MCTS Top-K spotcheck from {args.tech_json} "
+            f"({deck_a.name} vs {deck_b.name}, games={args.games}) — NIE do rankingu meta"
+        )
+        rows = spotcheck_top_k_from_json(
+            Path(args.tech_json),
+            my_deck=deck_a,
+            opp_deck=deck_b,
+            top_k=args.top_k,
+            games=args.games,
+            seed=args.seed,
+        )
+        for i, row in enumerate(rows, 1):
+            tech = row["tech"]
+            spot = row["ismcts"]
+            label = tech.get("card_in_name") or tech.get("card_name") or "?"
+            print(
+                f"{i}. +{tech.get('copies_swapped', tech.get('recommended_copies', '?'))}x {label} | "
+                f"IS-MCTS WR={spot['winrate_a']*100:.0f}% ({spot['wins_a']}/{spot['games']}) "
+                f"avg turns={spot['avg_turns']}"
+            )
+        out = RESULTS_DIR / "ismcts_spotcheck_topk.json"
+        out.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"[OK] {out}")
+        return
+
+    print(
+        f"[LorcanaAlpha] IS-MCTS spotcheck {deck_a.name} vs {deck_b.name} "
+        f"(games={args.games}, sims={args.simulations}, dets={args.determinizations})"
+    )
+    spot = spotcheck_matchup(
+        deck_a,
+        deck_b,
+        games=args.games,
+        seed=args.seed,
+        simulations=args.simulations,
+        determinizations=args.determinizations,
+    )
+    print(
+        f"IS-MCTS: {spot.wins_a}/{spot.games} wins ({spot.winrate_a*100:.0f}%) | "
+        f"avg turns={spot.avg_turns} | sims={spot.simulations} dets={spot.determinizations}"
+    )
+    print("Uwaga: to walidacja jakości gry, nie ranking Tech / CoreValue (używaj Heuristic L1 + DSL).")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="LorcanaAlpha CLI: AI Agent & Evolutionary Deckbuilder")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -649,6 +776,54 @@ def build_parser() -> argparse.ArgumentParser:
     p_nash = sub.add_parser("nash-meta", help="Solve Bo3 metagame Nash Equilibrium")
     p_nash.add_argument("--games", type=int, default=12)
 
+    p_ablate = sub.add_parser(
+        "core-ablate",
+        help="CoreValue leave-one-out (−1 copy) vs Duels.ink meta; Python DSL MatchupEvaluator only",
+    )
+    p_ablate.add_argument(
+        "--deck",
+        type=str,
+        default="decks/amber_emerald_princess_aggro_optimized.txt",
+        help="Full 60-card list (.txt path or archetype name)",
+    )
+    p_ablate.add_argument(
+        "--core-deck",
+        type=str,
+        default="decks/amber_emerald_princess_aggro_core44.txt",
+        help="Locked core .txt (N cards); flex = 60-N. Empty/missing → infer from archetype",
+    )
+    p_ablate.add_argument(
+        "--vs-meta",
+        type=str,
+        choices=["cache", "week"],
+        default="cache",
+        help="cache=use data_cache; week=sync Duels.ink period=week first",
+    )
+    p_ablate.add_argument("--top-meta", type=int, default=4, help="Top meta decks in gauntlet")
+    p_ablate.add_argument("--games", type=int, default=4, help="Games per matchup (smoke: 4; real: 24+)")
+    p_ablate.add_argument("--workers", type=int, default=0, help="Parallel workers (0=auto)")
+    p_ablate.add_argument("--lookahead-depth", type=int, default=0, help="Heuristic lookahead (0=fast smoke)")
+    p_ablate.add_argument(
+        "--replace",
+        type=str,
+        default="",
+        help="Optional filler card name to keep deck at 60 after −1 copy",
+    )
+    p_ablate.add_argument("--seed", type=int, default=2137)
+
+    p_ismcts = sub.add_parser(
+        "ismcts-spotcheck",
+        help="Tiny IS-MCTS play spotcheck (Top-K / single matchup) — not for meta rankings",
+    )
+    p_ismcts.add_argument("--deck-a", type=str, default="decks/amber_emerald_princess_aggro_optimized.txt")
+    p_ismcts.add_argument("--deck-b", type=str, default="Amber/Sapphire Detectives")
+    p_ismcts.add_argument("--tech-json", type=str, default="", help="Optional results/latest_tech_scan.json")
+    p_ismcts.add_argument("--top-k", type=int, default=2)
+    p_ismcts.add_argument("--games", type=int, default=2)
+    p_ismcts.add_argument("--simulations", type=int, default=8)
+    p_ismcts.add_argument("--determinizations", type=int, default=2)
+    p_ismcts.add_argument("--seed", type=int, default=2137)
+
     return parser
 
 
@@ -679,6 +854,10 @@ def main(argv: list[str] | None = None) -> None:
         cmd_evolve(args)
     elif args.command == "nash-meta":
         cmd_nash_meta(args)
+    elif args.command == "core-ablate":
+        cmd_core_ablate(args)
+    elif args.command == "ismcts-spotcheck":
+        cmd_ismcts_spotcheck(args)
     else:
         parser.print_help()
         sys.exit(1)

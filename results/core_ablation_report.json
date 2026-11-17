@@ -1,0 +1,204 @@
+{
+  "deck_name": "amber_emerald_princess_aggro_optimized",
+  "core_card_count": 44,
+  "flex_slots": 16,
+  "games_per_matchup": 4,
+  "meta_opponents": [
+    "Amber/Emerald Circle of Life",
+    "Amber/Sapphire Detectives",
+    "Emerald/Steel Midrange",
+    "Amber/Sapphire Control"
+  ],
+  "baseline_bo1": 0.6339,
+  "baseline_bo3": 0.6907,
+  "replace_card": null,
+  "rows": [
+    {
+      "card_id": 79,
+      "card_name": "Bobby Zimuruski - Spray Cheese Kid",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.6767,
+      "delta_bo1": 0.0428,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.7651,
+      "delta_bo3": 0.0743,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.5,
+        "Amber/Sapphire Detectives": 0.0,
+        "Emerald/Steel Midrange": 0.75,
+        "Amber/Sapphire Control": 0.0
+      }
+    },
+    {
+      "card_id": 699,
+      "card_name": "Elinor - Renowned Diplomat",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.6566,
+      "delta_bo1": 0.0226,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.6919,
+      "delta_bo3": 0.0012,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.5,
+        "Amber/Sapphire Detectives": 0.0,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": 0.25
+      }
+    },
+    {
+      "card_id": 91,
+      "card_name": "Ursula - Deceiver",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.6163,
+      "delta_bo1": -0.0176,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.6744,
+      "delta_bo3": -0.0163,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Sapphire Detectives": -0.25,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": 0.0
+      }
+    },
+    {
+      "card_id": 1047,
+      "card_name": "Mickey Mouse - Best in Town",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.6136,
+      "delta_bo1": -0.0204,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.6704,
+      "delta_bo3": -0.0203,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.5,
+        "Amber/Sapphire Detectives": 0.0,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": 0.0
+      }
+    },
+    {
+      "card_id": 431,
+      "card_name": "Pocahontas - Peacekeeper",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.5733,
+      "delta_bo1": -0.0606,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.6099,
+      "delta_bo3": -0.0808,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Sapphire Detectives": -0.25,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": -0.25
+      }
+    },
+    {
+      "card_id": 635,
+      "card_name": "Dale - Ready for His Shot",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.543,
+      "delta_bo1": -0.0909,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.5645,
+      "delta_bo3": -0.1262,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.5,
+        "Amber/Sapphire Detectives": -0.25,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": 0.0
+      }
+    },
+    {
+      "card_id": 410,
+      "card_name": "Thomas - Wide-Eyed Recruit",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.4744,
+      "delta_bo1": -0.1595,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.5046,
+      "delta_bo3": -0.1861,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.75,
+        "Amber/Sapphire Detectives": 0.0,
+        "Emerald/Steel Midrange": 0.75,
+        "Amber/Sapphire Control": -0.75
+      }
+    },
+    {
+      "card_id": 422,
+      "card_name": "Grandmother Willow - Ancient Advisor",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.5249,
+      "delta_bo1": -0.1091,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.4667,
+      "delta_bo3": -0.224,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.75,
+        "Amber/Sapphire Detectives": 0.25,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": -0.5
+      }
+    },
+    {
+      "card_id": 835,
+      "card_name": "Mike Wazowski - Heroic Climber",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.4195,
+      "delta_bo1": -0.2145,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.4423,
+      "delta_bo3": -0.2484,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.25,
+        "Amber/Sapphire Detectives": -0.5,
+        "Emerald/Steel Midrange": 0.0,
+        "Amber/Sapphire Control": 0.0
+      }
+    },
+    {
+      "card_id": 7,
+      "card_name": "Aurora - Holding Court",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.4294,
+      "delta_bo1": -0.2045,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.3941,
+      "delta_bo3": -0.2966,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.5,
+        "Amber/Sapphire Detectives": -0.5,
+        "Emerald/Steel Midrange": 0.5,
+        "Amber/Sapphire Control": -0.25
+      }
+    },
+    {
+      "card_id": 829,
+      "card_name": "Pocahontas - Guiding the Tribe",
+      "copies_in_core": 4,
+      "baseline_bo1": 0.6339,
+      "ablated_bo1": 0.3159,
+      "delta_bo1": -0.3181,
+      "baseline_bo3": 0.6907,
+      "ablated_bo3": 0.2439,
+      "delta_bo3": -0.4468,
+      "matchup_deltas": {
+        "Amber/Emerald Circle of Life": -0.75,
+        "Amber/Sapphire Detectives": -0.5,
+        "Emerald/Steel Midrange": 0.0,
+        "Amber/Sapphire Control": 0.25
+      }
+    }
+  ]
+}

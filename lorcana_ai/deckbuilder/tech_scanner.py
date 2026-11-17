@@ -111,7 +111,12 @@ class TechCardScanner:
     ) -> None:
         self.db = db or GLOBAL_CARD_DB
         self.cfg = cfg or DeckbuilderConfig()
-        self.evaluator = evaluator or MatchupEvaluator(workers=workers, lookahead_depth=lookahead_depth)
+        # Official tech / flex rankings always use Python DSL (never Rust greedy bitflag path).
+        self.evaluator = evaluator or MatchupEvaluator(
+            use_full_dsl_sim=True,
+            workers=workers,
+            lookahead_depth=lookahead_depth,
+        )
 
     def scan_for_matchup(
         self,
