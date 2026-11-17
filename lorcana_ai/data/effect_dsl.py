@@ -102,6 +102,12 @@ class EffectOpType(str, Enum):
     LOOK_AT_TOP = "LOOK_AT_TOP"
     GAIN_EVASIVE_SELF = "GAIN_EVASIVE_SELF"
     PUT_CARD_UNDER_SELF = "PUT_CARD_UNDER_SELF"
+    MILL_SELF = "MILL_SELF"
+    RIVERA_CHOOSE = "RIVERA_CHOOSE"
+    BANISH_OPP_TOTAL_STR = "BANISH_OPP_TOTAL_STR"
+    SAC_FORCE_OPP_BANISH = "SAC_FORCE_OPP_BANISH"
+    CANT_QUEST_CHARS = "CANT_QUEST_CHARS"
+    FREE_PLAY_FROM_DISCARD = "FREE_PLAY_FROM_DISCARD"
     NOOP_MARKED = "NOOP_MARKED"
 
 
@@ -488,6 +494,70 @@ class EffectDSLCompiler:
             abilities.clauses.append(
                 EffectClause(trigger=TriggerType.ON_PLAY, op=EffectOpType.GIVE_SELF_RUSH, amount=1)
             )
+        if (
+            "banish another chosen character of yours" in lower
+            and "each opponent chooses and banishes" in lower
+        ):
+            # Sid Phillips - Toy Surgeon: PLAYTIME'S OVER
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_PLAY,
+                    op=EffectOpType.SAC_FORCE_OPP_BANISH,
+                    amount=1,
+                    optional=True,
+                    choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                )
+            )
+        if (
+            "banish any number of chosen opposing characters with total" in lower
+            and ("¤" in no_rem or "strength" in lower or "{s}" in lower)
+        ):
+            # The Leviathan - Guardian of Atlantis
+            wipe_amt = str_thresh if str_thresh > 0 else 10
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_PLAY,
+                    op=EffectOpType.BANISH_OPP_TOTAL_STR,
+                    amount=wipe_amt,
+                    optional=True,
+                    choice_kind=ChoiceKind.TARGET_OPP_CHAR,
+                )
+            )
+        if "choose one:" in lower and "put the top 2 cards of your deck into your discard" in lower:
+            # Rivera Family Photo: HONOR THE PAST (mill OR lore if GY>=10)
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ACTIVATED,
+                    op=EffectOpType.RIVERA_CHOOSE,
+                    amount=2,
+                    cost_ink=default_cost_ink or 1,
+                    requires_exert=True,
+                )
+            )
+        # Torn Corner MEND THE PHOTO: resolved by mill helper when card hits discard from deck
+        # (Rivera Family Photo in play → free-play from discard); no separate ON_PLAY clause.
+        if "chosen character gets +1" in lower and "this turn" in lower and "◊" not in no_rem:
+            # Improvise / Inner Strength: +1 ¤ this turn (strength), then draw handled below
+            if not any(c.op == EffectOpType.BUFF_ALLY_STR for c in abilities.clauses):
+                abilities.clauses.append(
+                    EffectClause(
+                        trigger=default_trig,
+                        op=EffectOpType.BUFF_ALLY_STR,
+                        amount=1,
+                        choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                    )
+                )
+        if "can't quest until the start of your next turn" in lower:
+            # Strange Things
+            cant_amt = 2 if "up to 2" in lower else 1
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.CANT_QUEST_CHARS,
+                    amount=cant_amt,
+                    choice_kind=ChoiceKind.TARGET_ANY_CHAR,
+                )
+            )
         if "move up to 1 damage from chosen character of yours to this character" in lower:
             # Luisa Madrigal - Confident Climber (Set 13)
             abilities.clauses.append(
@@ -541,10 +611,14 @@ class EffectDSLCompiler:
                 )
             )
         elif (
-            ("banish chosen character" in lower and "of yours" not in lower)
-            or "banish chosen opposing character" in lower
-            or "shuffle chosen opposing character into their player's deck" in lower
-            or ("put chosen opposing character" in lower and "deck" in lower)
+            not any(c.op == EffectOpType.BANISH_OPP_TOTAL_STR for c in abilities.clauses)
+            and "any number of chosen opposing" not in lower
+            and (
+                ("banish chosen character" in lower and "of yours" not in lower)
+                or "banish chosen opposing character" in lower
+                or "shuffle chosen opposing character into their player's deck" in lower
+                or ("put chosen opposing character" in lower and "deck" in lower)
+            )
         ):
             op_t = EffectOpType.BANISH_LOW_STR_CHAR if str_thresh > 0 else EffectOpType.BANISH_CHAR
             eff_thresh = str_thresh if str_thresh > 0 else (-min_str_thresh if min_str_thresh > 0 else 0)
@@ -738,8 +812,13 @@ class EffectDSLCompiler:
             )
 
         # G. Lore Gain / Loss (including Lionheart +1 Lore to 2 chars / Pocahontas Finding the Way +1 Lore to 1 char)
+        # Skip Toy-banish / choose-one lore (handled as static cleanup or RIVERA_CHOOSE).
         m_lore = cls._RE_GAIN_LORE.search(no_rem)
-        if m_lore:
+        skip_gain_lore = (
+            "whenever a toy character is banished" in lower
+            or ("choose one:" in lower and "put the top" in lower and "discard" in lower)
+        )
+        if m_lore and not skip_gain_lore:
             abilities.clauses.append(
                 EffectClause(
                     trigger=default_trig,

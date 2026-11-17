@@ -242,6 +242,9 @@ def cmd_optimize_core(args: argparse.Namespace) -> None:
     if "princess" in name_low:
         slug = "princess_aggro"
         out_filename = "amber_emerald_princess_aggro_optimized.txt"
+    elif "retro" in name_low or "action retro" in name_low:
+        slug = "retro_device"
+        out_filename = "user_emerald_ruby_retro_device_optimized.txt"
     elif "steel" in name_low or "green" in name_low:
         slug = "green_steel"
         out_filename = "emerald_steel_green_steel_optimized.txt"
@@ -345,24 +348,44 @@ def cmd_train(args: argparse.Namespace) -> None:
 
 def cmd_scan_tech(args: argparse.Namespace) -> None:
     decks = get_reference_meta_decks()
-    core_counts, baseline_deck = get_archetype_core_and_baseline(args.my_deck)
-    locked_ids = set(core_counts.keys()) if core_counts else set()
+    my_path = Path(args.my_deck)
+    opp_path = Path(args.opp_deck)
 
-    opt_slug = "princess_aggro" if "princess" in args.my_deck.lower() else ("circle_of_life" if "circle" in args.my_deck.lower() else "")
-    opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
-    if opt_file and opt_file.exists():
-        my_deck = Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{args.my_deck} (Optimized)")
-    elif baseline_deck is not None:
-        my_deck = baseline_deck
+    # Prefer explicit .txt paths (e.g. user Emerald/Ruby Retro Device list)
+    if my_path.exists() and my_path.suffix.lower() == ".txt":
+        my_deck = Deck.from_dreamborn_text(my_path.read_text(encoding="utf-8"), name=my_path.stem)
+        core_path = PROJECT_ROOT / "decks" / "user_emerald_ruby_retro_device_core_loops.txt"
+        if "retro" in my_path.stem.lower() and core_path.exists():
+            core_deck = Deck.from_dreamborn_text(core_path.read_text(encoding="utf-8"), name="retro_core")
+            locked_ids = set(core_deck.card_counts.keys())
+        else:
+            locked_ids = set()
     else:
-        my_deck = decks.get(args.my_deck) or next(
-            (d for k, d in decks.items() if args.my_deck.lower() in k.lower()),
-            list(decks.values())[0],
+        core_counts, baseline_deck = get_archetype_core_and_baseline(args.my_deck)
+        locked_ids = set(core_counts.keys()) if core_counts else set()
+        opt_slug = (
+            "princess_aggro"
+            if "princess" in args.my_deck.lower()
+            else ("circle_of_life" if "circle" in args.my_deck.lower() else "")
         )
-    opp_deck = decks.get(args.opp_deck) or next(
-        (d for k, d in decks.items() if args.opp_deck.lower() in k.lower()),
-        list(decks.values())[1],
-    )
+        opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
+        if opt_file and opt_file.exists():
+            my_deck = Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{args.my_deck} (Optimized)")
+        elif baseline_deck is not None:
+            my_deck = baseline_deck
+        else:
+            my_deck = decks.get(args.my_deck) or next(
+                (d for k, d in decks.items() if args.my_deck.lower() in k.lower()),
+                list(decks.values())[0],
+            )
+
+    if opp_path.exists() and opp_path.suffix.lower() == ".txt":
+        opp_deck = Deck.from_dreamborn_text(opp_path.read_text(encoding="utf-8"), name=opp_path.stem)
+    else:
+        opp_deck = decks.get(args.opp_deck) or next(
+            (d for k, d in decks.items() if args.opp_deck.lower() in k.lower()),
+            list(decks.values())[1],
+        )
 
     print(f"[LorcanaAlpha] Scanning Tech-Cards for '{my_deck.name}' vs '{opp_deck.name}' (Python DSL)...")
     lookahead_depth = getattr(args, "lookahead_depth", 1)

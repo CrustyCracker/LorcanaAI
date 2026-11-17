@@ -462,10 +462,13 @@ class LorcanaSimulator:
             ent.boosted_this_turn = False
             ent.temp_challenger_mod = 0
             ent.temp_lore_mod = 0
-        # Clear "until the start of your next turn" strength debuffs placed on opp's characters
+            # Strange Things / similar: can't quest until start of your next turn
+            ent.temp_cant_quest = False
+        # Clear "until the start of your next turn" strength debuffs / quest locks placed on opp
         for ent in opp.board:
             if ent.temp_strength_mod < 0:
                 ent.temp_strength_mod = 0
+            ent.temp_cant_quest = False
 
         # Set step (CR Rule 2.3.2): passive location lore & start-of-turn triggers
         for loc in p.locations_in_play:
@@ -513,6 +516,11 @@ class LorcanaSimulator:
         if trigger == TriggerType.ON_PLAY:
             if "if you played another character this turn" in card_lower and p.chars_played_this_turn < 2:
                 return
+            if (
+                "if 2 or more cards were put into your discard this turn" in card_lower
+                and p.cards_discarded_this_turn < 2
+            ):
+                return
             if "if you have another detective character in play" in card_lower:
                 has_other_det = any(
                     "Detective" in e.card.subtypes and e.instance_id != source_id
@@ -525,13 +533,18 @@ class LorcanaSimulator:
                 return
             if "if an opponent has more cards in their hand than you" in card_lower and len(opp.hand) <= len(p.hand):
                 return
-        if trigger == TriggerType.ACTIVATED:
-            if "if you have 10 or more cards in your discard" in card_lower and len(p.discard) < 10:
-                return
 
         for cl in card.abilities.clauses:
             if cl.trigger == trigger:
                 if cl.requires_card_under and (source_ent is None or source_ent.cards_under_count <= 0):
+                    continue
+                # Per-clause GY≥10 gate (Torn Corner draw). Do not block Rivera mill/choose-one.
+                if (
+                    trigger == TriggerType.ACTIVATED
+                    and cl.op != EffectOpType.RIVERA_CHOOSE
+                    and "if you have 10 or more cards in your discard" in card_lower
+                    and len(p.discard) < 10
+                ):
                     continue
                 cls._execute_single_clause(
                     state,
@@ -1211,15 +1224,20 @@ class LorcanaSimulator:
         elif op == EffectOpType.BUFF_ALLY_STR:
             buff_val = cl.amount
             if "put the top 3 cards of your deck into your discard" in card_text:
-                for _ in range(min(3, len(p.deck))):
-                    p.discard.append(p.deck.pop())
-                buff_val = sum(1 for c in p.discard if c.is_song)
+                milled = cls._mill_top_to_discard(state, controller_id, 3)
+                buff_val = sum(1 for c in milled if c.is_song)
             allies = [e for e in p.characters_in_play if e.instance_id != source_id and e.can_challenge()]
             if not allies:
                 allies = [e for e in p.characters_in_play if e.instance_id != source_id]
+            # Actions (Improvise/Inner Strength) buff any chosen character including self source N/A
+            if is_action_source and not allies:
+                allies = list(p.characters_in_play)
             if allies and buff_val > 0:
                 best_ally = max(allies, key=lambda e: e.effective_strength)
-                best_ally.temp_challenger_mod += buff_val
+                if "challenger" in card_text:
+                    best_ally.temp_challenger_mod += buff_val
+                else:
+                    best_ally.temp_strength_mod += buff_val
 
         elif op == EffectOpType.BUFF_ALLY_LORE:
             # Lionheart - Incumbent Mayor ("up to 2 chosen characters get +1 ◊ this turn")
@@ -1395,6 +1413,73 @@ class LorcanaSimulator:
                     p.deck.insert(0, c)
                 source_ent.drying = False
 
+        elif op == EffectOpType.MILL_SELF:
+            cls._mill_top_to_discard(state, controller_id, max(1, cl.amount))
+
+        elif op == EffectOpType.RIVERA_CHOOSE:
+            # Rivera Family Photo: mill top 2 OR gain 1 lore if GY>=10 (after mill check uses pre-mill size for lore race).
+            gy_before = len(p.discard)
+            prefer_lore = gy_before >= 10 and p.lore + 1 < 20 and (
+                opp.lore >= p.lore or gy_before >= 14
+            )
+            if prefer_lore:
+                p.lore += 1
+            else:
+                cls._mill_top_to_discard(state, controller_id, max(2, cl.amount))
+
+        elif op == EffectOpType.BANISH_OPP_TOTAL_STR:
+            # Leviathan: banish any number of opposing characters with total ¤ <= amount
+            budget = cl.amount if cl.amount > 0 else 10
+            targets = [
+                e for e in opp.characters_in_play
+                if not e.has_keyword(KeywordFlag.WARD)
+            ]
+            targets.sort(key=lambda e: (e.card.lore * 3 + e.effective_strength, e.card.cost), reverse=True)
+            spent = 0
+            for t in targets:
+                cost_str = t.effective_strength
+                if spent + cost_str <= budget:
+                    t.damage = t.effective_willpower + 10
+                    spent += cost_str
+            if spent > 0:
+                cls._cleanup_banished(state)
+
+        elif op == EffectOpType.SAC_FORCE_OPP_BANISH:
+            # Sid Phillips: banish another ally; if you do, each opponent banishes one of theirs
+            allies = [e for e in p.characters_in_play if e.instance_id != source_id]
+            if allies:
+                sac = min(allies, key=lambda e: (e.card.lore, e.effective_strength, e.card.cost))
+                sac.damage = sac.effective_willpower + 10
+                cls._cleanup_banished(state)
+                if opp.characters_in_play:
+                    victim = max(
+                        opp.characters_in_play,
+                        key=lambda e: (e.card.lore * 2 + e.effective_strength, e.card.cost),
+                    )
+                    victim.damage = victim.effective_willpower + 10
+                    cls._cleanup_banished(state)
+
+        elif op == EffectOpType.CANT_QUEST_CHARS:
+            opp_pool = [e for e in opp.characters_in_play if not e.has_keyword(KeywordFlag.WARD)]
+            ally_pool = list(p.characters_in_play)
+            pool = opp_pool if opp_pool else ally_pool
+            pool.sort(
+                key=lambda e: (
+                    not e.exerted,
+                    e.effective_lore(
+                        opp if e in opp.characters_in_play else p,
+                        p if e in opp.characters_in_play else opp,
+                    ),
+                ),
+                reverse=True,
+            )
+            for ent in pool[: max(1, cl.amount)]:
+                ent.temp_cant_quest = True
+
+        elif op == EffectOpType.FREE_PLAY_FROM_DISCARD:
+            # Used by mill helper for Torn Corner recycle
+            cls._try_free_play_milled_card(state, controller_id, cl.target_filter)
+
         elif op == EffectOpType.MOVE_DAMAGE:
             # Luisa Madrigal - Confident Climber (Set 13): "1 ⬡ — Move up to 1 damage from chosen character of yours to this character. Then, if this character has 3 or more damage, move all damage from this character to chosen opposing character."
             source_ent = next((e for e in p.board if e.instance_id == source_id), None)
@@ -1455,6 +1540,64 @@ class LorcanaSimulator:
                     g.temp_evasive = True
 
     @classmethod
+    def _mill_top_to_discard(cls, state: GameState, controller_id: int, count: int) -> list:
+        """Put top N deck cards into discard; fire Torn Corner–style recycle when applicable."""
+        from lorcana_ai.data.card_db import CardTemplate
+
+        p = state.players[controller_id]
+        milled: list[CardTemplate] = []
+        for _ in range(max(0, count)):
+            if not p.deck:
+                break
+            card = p.deck.pop()
+            p.discard.append(card)
+            p.cards_discarded_this_turn += 1
+            milled.append(card)
+            cls._maybe_mend_photo_recycle(state, controller_id, card)
+        return milled
+
+    @classmethod
+    def _maybe_mend_photo_recycle(cls, state: GameState, controller_id: int, card) -> None:
+        """Torn Corner: when milled from deck, free-play if Rivera Family Photo is in play."""
+        text = card.full_text.lower()
+        if "when this card is put into your discard from your deck" not in text:
+            return
+        if "play this card from your discard for free" not in text:
+            return
+        p = state.players[controller_id]
+        has_rivera = any(
+            e.card.full_name == "Rivera Family Photo" for e in p.items_in_play
+        )
+        if not has_rivera:
+            return
+        # Optional "you may" — bots always take the recycle when available.
+        try:
+            idx = next(i for i, c in enumerate(p.discard) if c.card_id == card.card_id)
+        except StopIteration:
+            return
+        p.discard.pop(idx)
+        new_ent = BoardEntity(
+            instance_id=state.next_instance_id,
+            card=card,
+            exerted=False,
+            drying=False,
+        )
+        state.next_instance_id += 1
+        p.board.append(new_ent)
+
+    @classmethod
+    def _try_free_play_milled_card(cls, state: GameState, controller_id: int, target_filter: str) -> None:
+        p = state.players[controller_id]
+        if target_filter == "rivera_photo" and not any(
+            e.card.full_name == "Rivera Family Photo" for e in p.items_in_play
+        ):
+            return
+        for i, c in enumerate(list(p.discard)):
+            if "when this card is put into your discard from your deck" in c.full_text.lower():
+                cls._maybe_mend_photo_recycle(state, controller_id, c)
+                return
+
+    @classmethod
     def _cleanup_banished(cls, state: GameState) -> None:
         while True:
             any_banished = False
@@ -1490,10 +1633,26 @@ class LorcanaSimulator:
                     "whenever another character of yours is banished, draw a card" in r.card.full_text.lower()
                     for r in remaining
                 )
+                # Sid Phillips DOUBLE PRIZES: during your turn, whenever a Toy is banished, gain 2 lore
+                active = state.players[state.active_player]
+                sid_toy_lore = (
+                    state.phase not in ("GAME_OVER",)
+                    and any(
+                        "whenever a toy character is banished" in r.card.full_text.lower()
+                        and "gain 2 lore" in r.card.full_text.lower()
+                        for r in active.board
+                    )
+                )
                 for ent in banished:
                     cls._resolve_clauses(
                         state, pid, ent.card, TriggerType.ON_LEAVE_PLAY, source_id=ent.instance_id
                     )
+                    if (
+                        sid_toy_lore
+                        and ent.card.card_type == "Character"
+                        and "Toy" in ent.card.subtypes
+                    ):
+                        active.lore += 2
                     if ent.card.card_type == "Character" and has_mickey_minnie_duo and pl.deck:
                         pl.hand.append(pl.deck.pop())
                     if ent.card.card_type == "Character" and has_belle_snowfield and pl.inkwell_total < 12:

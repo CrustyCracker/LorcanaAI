@@ -33,6 +33,7 @@ class BoardEntity:
     boosted_this_turn: bool = False
     temp_evasive: bool = False
     temp_adventurous: bool = False
+    temp_cant_quest: bool = False
     shifted_under_card: CardTemplate | None = None
     shifted_under_cards: list[CardTemplate] = field(default_factory=list)
     location_instance_id: int = -1
@@ -280,6 +281,8 @@ class BoardEntity:
             return False
         if self.exerted or self.drying:
             return False
+        if self.temp_cant_quest:
+            return False
         # CR Rule 8.7.2: Reckless character can't quest
         if self.has_keyword(KeywordFlag.RECKLESS):
             return False
@@ -327,6 +330,7 @@ class BoardEntity:
             boosted_this_turn=self.boosted_this_turn,
             temp_evasive=self.temp_evasive,
             temp_adventurous=self.temp_adventurous,
+            temp_cant_quest=self.temp_cant_quest,
             shifted_under_card=self.shifted_under_card,
             shifted_under_cards=list(self.shifted_under_cards),
             location_instance_id=self.location_instance_id,
