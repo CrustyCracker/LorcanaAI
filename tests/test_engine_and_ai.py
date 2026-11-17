@@ -271,9 +271,11 @@ class TestEngineAndAI(unittest.TestCase):
         # 1. Pluto - Friendly Pooch activated ability gives -1 character discount
         self.assertTrue(any(cl.op == EffectOpType.DISCOUNT_NEXT_CHAR and cl.requires_exert for cl in pluto.abilities.clauses))
 
-        # 2. Nani - Stage Manager draws/reveals character with cost <= 2 from top 4 of deck
+        # 2. Nani - Stage Manager looks at top 4 / reveals character with cost <= 2
         self.assertIn("cost 2 or less", nani.full_text.lower())
-        self.assertTrue(any(cl.op == EffectOpType.DRAW for cl in nani.abilities.clauses))
+        self.assertTrue(
+            any(cl.op in (EffectOpType.DRAW, EffectOpType.LOOK_AT_TOP) for cl in nani.abilities.clauses)
+        )
 
         # 3. Elinor - Renowned Diplomat End of Turn trigger requires 3 exerted characters
         self.assertTrue(any(cl.trigger == TriggerType.END_OF_TURN for cl in elinor.abilities.clauses))

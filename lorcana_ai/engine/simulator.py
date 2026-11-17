@@ -16,12 +16,13 @@ import random
 
 from lorcana_ai.data.card_db import CardTemplate
 from lorcana_ai.data.effect_dsl import (
+    ChoiceKind,
     EffectClause,
     EffectOpType,
     KeywordFlag,
     TriggerType,
 )
-from lorcana_ai.engine.game_state import BoardEntity, GameState
+from lorcana_ai.engine.game_state import BoardEntity, GameState, PendingChoice
 from lorcana_ai.engine.move_generator import ActionType, GameAction
 
 try:
@@ -33,6 +34,10 @@ except ImportError:
 
 class LorcanaSimulator:
     """Executes legal GameActions and resolves DSL card triggers on a GameState."""
+
+    # When False (default), choice nodes are auto-resolved by heuristic policy.
+    # Text playtest sets this True so humans pick via RESOLVE_CHOICE actions.
+    interactive_choices: bool = False
 
     @classmethod
     def step(cls, state: GameState, action: GameAction, rng: random.Random | None = None) -> GameState:
@@ -111,11 +116,11 @@ class LorcanaSimulator:
                     accum = 0
                     ready_singers = sorted(
                         [e for e in p.characters_in_play if not e.exerted and not e.drying],
-                        key=lambda e: (e.effective_lore(p, opp), -(e.card.abilities.singer_cost or e.card.cost)),
+                        key=lambda e: (e.effective_lore(p, opp), -e.effective_singer_cost(p)),
                     )
                     for ent in ready_singers:
                         ent.exerted = True
-                        accum += ent.card.abilities.singer_cost or ent.card.cost
+                        accum += ent.effective_singer_cost(p)
                         if accum >= needed:
                             break
                 else:
@@ -206,23 +211,41 @@ class LorcanaSimulator:
             cls._check_victory(state)
             return state
 
+        # 3b. RESOLVE pending choice node
+        if action.action_type == ActionType.RESOLVE_CHOICE:
+            cls._resolve_pending_choice(state, action, rng=rng)
+            cls._check_victory(state)
+            return state
+
         # 4. QUEST (CR Rule 4.5)
         if action.action_type == ActionType.QUEST:
             for ent in p.characters_in_play:
                 if ent.instance_id == action.source_instance_id and ent.can_quest():
                     ent.exerted = True
                     p.lore += ent.effective_lore(p, opp)
-                    if ent.has_keyword(KeywordFlag.SUPPORT):
-                        for ally in p.characters_in_play:
-                            if ally.instance_id != ent.instance_id:
-                                ally.temp_strength_mod += ent.effective_strength
-                                break
-                    # Mickey Mouse - Bob Cratchit (Set 11): "Whenever this character quests, put the top card of your deck facedown under him."
-                    if "whenever this character quests, put the top card of your deck facedown under" in ent.card.full_text.lower():
-                        if p.deck:
-                            p.deck.pop()
-                            ent.cards_under_count += 1
-                    # Mickey Mouse - Expedition Leader: "While this character is exerted, whenever one of your other characters quests, chosen opposing character gets -2 ¤ until the start of your next turn."
+                    # Support: open choice node (bots auto-pick via policy when interactive=False)
+                    if ent.has_keyword(KeywordFlag.SUPPORT, owner=p, opp=opp):
+                        allies = [
+                            a.instance_id
+                            for a in p.characters_in_play
+                            if a.instance_id != ent.instance_id
+                        ]
+                        if allies:
+                            cls._open_or_auto_choice(
+                                state,
+                                PendingChoice(
+                                    controller_id=p_id,
+                                    choice_kind=ChoiceKind.SUPPORT_TARGET.value,
+                                    source_instance_id=ent.instance_id,
+                                    clause_op=EffectOpType.SUPPORT_BUFF.value,
+                                    amount=ent.effective_strength_with(p, opp),
+                                    optional=True,
+                                    candidate_ids=tuple(allies),
+                                    prompt="Support: add this character's Strength to chosen ally",
+                                ),
+                                rng=rng,
+                            )
+                    # Mickey Mouse - Expedition Leader: "While this character is exerted, whenever one of your other characters quests..."
                     for ally in p.characters_in_play:
                         if (
                             ally.instance_id != ent.instance_id
@@ -231,10 +254,14 @@ class LorcanaSimulator:
                         ):
                             opp_targets = [
                                 e for e in opp.characters_in_play
-                                if e.effective_strength > 0 and not e.has_keyword(KeywordFlag.WARD)
+                                if e.effective_strength_with(opp, p) > 0
+                                and not e.has_keyword(KeywordFlag.WARD, owner=opp, opp=p)
                             ]
                             if opp_targets:
-                                best_opp = max(opp_targets, key=lambda e: (e.effective_strength, e.card.lore))
+                                best_opp = max(
+                                    opp_targets,
+                                    key=lambda e: (e.effective_strength_with(opp, p), e.card.lore),
+                                )
                                 best_opp.temp_strength_mod -= 2
                     cls._resolve_clauses(state, p_id, ent.card, TriggerType.ON_QUEST, source_id=ent.instance_id)
                     break
@@ -1012,11 +1039,13 @@ class LorcanaSimulator:
         elif op == EffectOpType.BANISH_CHAR:
             min_str = abs(cl.threshold) if cl.threshold < 0 else 0
             only_evasive = "chosen character with evasive" in card_text
+            only_exerted = cl.target_filter == "exerted" or "chosen exerted character" in card_text
             targets = [
                 e for e in opp.characters_in_play
                 if e.effective_strength >= min_str
                 and not e.has_keyword(KeywordFlag.WARD)
                 and (not only_evasive or e.has_keyword(KeywordFlag.EVASIVE))
+                and (not only_exerted or e.exerted)
             ]
             if targets:
                 best_t = max(targets, key=lambda e: (e.card.lore * 3 + e.effective_strength + e.card.cost))
@@ -1205,7 +1234,10 @@ class LorcanaSimulator:
 
         elif op == EffectOpType.DEBUFF_OPP_STR:
             targets = [e for e in opp.characters_in_play if not e.has_keyword(KeywordFlag.WARD)]
-            if targets:
+            if cl.threshold >= 99:
+                for t in targets:
+                    t.temp_strength_mod -= cl.amount
+            elif targets:
                 best_opp = max(
                     targets,
                     key=lambda e: (1 <= e.effective_strength <= 4, e.card.lore),
@@ -1217,8 +1249,92 @@ class LorcanaSimulator:
         elif op == EffectOpType.READY_CHAR:
             exerted_allies = [e for e in p.characters_in_play if e.exerted]
             if exerted_allies:
-                best_ally = max(exerted_allies, key=lambda e: e.effective_strength)
-                best_ally.exerted = False
+                if cls.interactive_choices and cl.choice_kind == ChoiceKind.TARGET_ALLY_CHAR:
+                    cls._open_or_auto_choice(
+                        state,
+                        PendingChoice(
+                            controller_id=controller_id,
+                            choice_kind=ChoiceKind.TARGET_ALLY_CHAR.value,
+                            source_instance_id=source_id,
+                            clause_op=EffectOpType.READY_CHAR.value,
+                            amount=1,
+                            optional=cl.optional,
+                            candidate_ids=tuple(e.instance_id for e in exerted_allies),
+                            prompt="Ready chosen character",
+                        ),
+                    )
+                else:
+                    best_ally = max(exerted_allies, key=lambda e: e.effective_strength_with(p, opp))
+                    best_ally.exerted = False
+
+        elif op == EffectOpType.READY_ALL_CHARS:
+            for e in p.characters_in_play:
+                e.exerted = False
+
+        elif op == EffectOpType.HEAL:
+            if cl.target_filter == "enter_damage":
+                source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+                if source_ent is not None:
+                    source_ent.damage += max(0, cl.threshold)
+                return
+            if cl.target_filter == "self":
+                source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+                if source_ent is not None:
+                    source_ent.damage = max(0, source_ent.damage - cl.amount)
+                return
+            damaged = [c for c in p.characters_in_play if c.damage > 0]
+            if cl.choice_kind in (ChoiceKind.TARGET_ANY_CHAR, ChoiceKind.TARGET_ALLY_CHAR) and damaged:
+                if cls.interactive_choices:
+                    cls._open_or_auto_choice(
+                        state,
+                        PendingChoice(
+                            controller_id=controller_id,
+                            choice_kind=cl.choice_kind.value,
+                            source_instance_id=source_id,
+                            clause_op=EffectOpType.HEAL.value,
+                            amount=cl.amount,
+                            optional=cl.optional,
+                            candidate_ids=tuple(e.instance_id for e in damaged),
+                            prompt=f"Remove up to {cl.amount} damage",
+                        ),
+                    )
+                else:
+                    best = max(damaged, key=lambda e: e.damage)
+                    best.damage = max(0, best.damage - (cl.amount if cl.amount < 99 else best.damage))
+            elif damaged:
+                best = max(damaged, key=lambda e: e.damage)
+                best.damage = max(0, best.damage - (cl.amount if cl.amount < 99 else best.damage))
+
+        elif op == EffectOpType.LOOK_AT_TOP:
+            # Approximate: draw that many (policy keeps); interactive could refine later
+            n = max(1, cl.amount)
+            for _ in range(n):
+                if p.deck:
+                    p.hand.append(p.deck.pop())
+
+        elif op == EffectOpType.PUT_CARD_UNDER_SELF:
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if source_ent is not None and p.deck:
+                p.deck.pop()
+                source_ent.cards_under_count += 1
+
+        elif op == EffectOpType.SUPPORT_BUFF:
+            # Handled at quest-time choice; no-op if reached here
+            pass
+
+        elif op == EffectOpType.BUFF_ALLY_WILLPOWER:
+            allies = [e for e in p.characters_in_play if e.instance_id != source_id]
+            if allies:
+                best_ally = max(allies, key=lambda e: e.effective_willpower_with(p, opp))
+                best_ally.temp_willpower_mod += cl.amount
+
+        elif op == EffectOpType.GAIN_EVASIVE_SELF:
+            source_ent = next((e for e in p.board if e.instance_id == source_id), None)
+            if source_ent is not None:
+                source_ent.temp_evasive = True
+
+        elif op == EffectOpType.NOOP_MARKED:
+            pass
 
         elif op == EffectOpType.RETRO_EVOLVE:
             # Retro Evolution Device (Set 14): "⟳, 1 ⬡, Banish chosen character of yours — Play a character with cost up to 2 more than the banished character for free."
@@ -1390,6 +1506,139 @@ class LorcanaSimulator:
                         pl.discard.append(u_card)
             if not any_banished:
                 break
+
+    @classmethod
+    def _open_or_auto_choice(
+        cls,
+        state: GameState,
+        pending: PendingChoice,
+        rng: random.Random | None = None,
+    ) -> None:
+        """Queue a choice for interactive play, or immediately auto-pick for bots."""
+        rng = rng or random.Random()
+        # Interactive only for the human controller (P0); bots always use policy.
+        if cls.interactive_choices and pending.controller_id == 0:
+            state.phase_before_choice = state.phase if state.phase != "CHOICE" else state.phase_before_choice
+            state.pending_choice = pending
+            state.phase = "CHOICE"
+            state.active_player = pending.controller_id
+            return
+        # Heuristic policy: prefer highest-lore ready ally for Support; else first candidate / decline if empty
+        if not pending.candidate_ids:
+            return
+        p = state.players[pending.controller_id]
+        opp = state.players[1 - pending.controller_id]
+        best_id = pending.candidate_ids[0]
+        if pending.choice_kind == ChoiceKind.SUPPORT_TARGET.value:
+            scored = []
+            for cid in pending.candidate_ids:
+                ent = next((e for e in p.characters_in_play if e.instance_id == cid), None)
+                if ent is None:
+                    continue
+                scored.append(
+                    (
+                        (1 if not ent.exerted and not ent.drying else 0),
+                        ent.effective_lore(p, opp),
+                        ent.effective_strength_with(p, opp),
+                        cid,
+                    )
+                )
+            if scored:
+                scored.sort(reverse=True)
+                best_id = scored[0][-1]
+        elif pending.choice_kind in (
+            ChoiceKind.TARGET_OPP_CHAR.value,
+            ChoiceKind.TARGET_ANY_CHAR.value,
+        ):
+            scored = []
+            for cid in pending.candidate_ids:
+                ent = next((e for e in opp.characters_in_play if e.instance_id == cid), None)
+                if ent is None:
+                    ent = next((e for e in p.characters_in_play if e.instance_id == cid), None)
+                if ent is None:
+                    continue
+                scored.append((ent.card.lore, ent.effective_strength_with(p, opp), cid))
+            if scored:
+                scored.sort(reverse=True)
+                best_id = scored[0][-1]
+        act = GameAction(
+            action_type=ActionType.RESOLVE_CHOICE,
+            source_instance_id=pending.source_instance_id,
+            target_instance_id=best_id,
+            description="Auto-choice policy",
+        )
+        # Apply without re-entering CHOICE phase
+        prev = cls.interactive_choices
+        cls.interactive_choices = False
+        state.pending_choice = pending
+        try:
+            cls._apply_choice_selection(state, act)
+        finally:
+            cls.interactive_choices = prev
+            state.pending_choice = None
+
+    @classmethod
+    def _resolve_pending_choice(
+        cls,
+        state: GameState,
+        action: GameAction,
+        rng: random.Random | None = None,
+    ) -> None:
+        if state.pending_choice is None:
+            state.phase = state.phase_before_choice or "MAIN"
+            return
+        cls._apply_choice_selection(state, action)
+        state.pending_choice = None
+        state.phase = state.phase_before_choice or "MAIN"
+
+    @classmethod
+    def _apply_choice_selection(cls, state: GameState, action: GameAction) -> None:
+        pc = state.pending_choice
+        if pc is None:
+            return
+        if action.decline_choice:
+            return
+        p = state.players[pc.controller_id]
+        opp = state.players[1 - pc.controller_id]
+        if pc.clause_op == EffectOpType.SUPPORT_BUFF.value or pc.choice_kind == ChoiceKind.SUPPORT_TARGET.value:
+            target = next((e for e in p.characters_in_play if e.instance_id == action.target_instance_id), None)
+            if target is not None:
+                target.temp_strength_mod += max(0, pc.amount)
+            return
+        if pc.clause_op == EffectOpType.READY_CHAR.value:
+            target = next((e for e in p.characters_in_play if e.instance_id == action.target_instance_id), None)
+            if target is not None:
+                target.exerted = False
+            return
+        if pc.clause_op == EffectOpType.HEAL.value:
+            target = next(
+                (
+                    e
+                    for e in (p.characters_in_play + opp.characters_in_play)
+                    if e.instance_id == action.target_instance_id
+                ),
+                None,
+            )
+            if target is not None:
+                target.damage = max(0, target.damage - max(1, pc.amount if pc.amount < 99 else target.damage))
+            return
+        # Generic ally strength buff fallback
+        if pc.choice_kind in (ChoiceKind.TARGET_ALLY_CHAR.value, ChoiceKind.TARGET_ANY_CHAR.value):
+            target = next(
+                (
+                    e
+                    for e in (p.characters_in_play + opp.characters_in_play)
+                    if e.instance_id == action.target_instance_id
+                ),
+                None,
+            )
+            if target is not None and pc.amount:
+                if pc.clause_op == EffectOpType.BUFF_ALLY_LORE.value:
+                    target.temp_lore_mod += pc.amount
+                elif pc.clause_op == EffectOpType.BUFF_ALLY_WILLPOWER.value:
+                    target.temp_willpower_mod += pc.amount
+                else:
+                    target.temp_strength_mod += pc.amount
 
     @classmethod
     def _check_victory(cls, state: GameState) -> bool:

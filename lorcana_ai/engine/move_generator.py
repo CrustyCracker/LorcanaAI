@@ -30,6 +30,7 @@ class ActionType(str, Enum):
     MOVE_TO_LOCATION = "MOVE_TO_LOCATION"
     USE_ABILITY = "USE_ABILITY"
     PASS_TURN = "PASS_TURN"
+    RESOLVE_CHOICE = "RESOLVE_CHOICE"
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class GameAction:
     enter_exerted: bool = False
     mulligan_keep_mask: tuple[bool, ...] = ()
     description: str = ""
+    decline_choice: bool = False  # optional "you may" → decline
 
     def action_slot_id(self, max_space: int = 256) -> int:
         """Maps any GameAction deterministically into [0, max_space - 1] for Policy Network logits."""
@@ -68,6 +70,10 @@ class GameAction:
             return 216 + ((max(0, self.source_instance_id) + max(0, self.target_instance_id)) % 16)
         if self.action_type == ActionType.USE_ABILITY:
             return 232 + (max(0, self.source_instance_id) % 24)
+        if self.action_type == ActionType.RESOLVE_CHOICE:
+            if self.decline_choice:
+                return 250
+            return 240 + (max(0, self.target_instance_id) % 10)
         return 0
 
 
@@ -78,6 +84,35 @@ class MoveGenerator:
     def generate_legal_actions(cls, state: GameState) -> list[GameAction]:
         if state.phase == "GAME_OVER":
             return []
+        # Choice stack: only resolve pending choice (or decline if optional)
+        if state.phase == "CHOICE" and state.pending_choice is not None:
+            pc = state.pending_choice
+            actions: list[GameAction] = []
+            for cid in pc.candidate_ids:
+                actions.append(
+                    GameAction(
+                        action_type=ActionType.RESOLVE_CHOICE,
+                        source_instance_id=pc.source_instance_id,
+                        target_instance_id=cid,
+                        description=f"Choose target #{cid}: {pc.prompt}",
+                    )
+                )
+            if pc.optional or not pc.candidate_ids:
+                actions.append(
+                    GameAction(
+                        action_type=ActionType.RESOLVE_CHOICE,
+                        source_instance_id=pc.source_instance_id,
+                        decline_choice=True,
+                        description=f"Decline: {pc.prompt}",
+                    )
+                )
+            return actions or [
+                GameAction(
+                    action_type=ActionType.RESOLVE_CHOICE,
+                    decline_choice=True,
+                    description="Decline (no legal targets)",
+                )
+            ]
 
         p = state.players[state.active_player]
         opp = state.players[1 - state.active_player]
@@ -105,7 +140,7 @@ class MoveGenerator:
 
         # 3. Play cards from hand / Shift (all 6 variants, CR Rule 8.10.8) / Sing Songs (CR Rule 8.11 & 8.12)
         ready_dry_chars = [e for e in p.characters_in_play if not e.exerted and not e.drying]
-        total_chorus_power = sum((e.card.abilities.singer_cost or e.card.cost) for e in ready_dry_chars)
+        total_chorus_power = sum(e.effective_singer_cost(p) for e in ready_dry_chars)
         is_p2_first_turn = (state.turn_number == 2 and state.active_player != state.starting_player)
         has_char_in_discard = any(c.card_type == "Character" for c in p.discard)
 
@@ -214,7 +249,7 @@ class MoveGenerator:
                         )
                     )
                 for ent in ready_dry_chars:
-                    if ent.can_sing(card.cost):
+                    if ent.can_sing(card.cost, owner=p):
                         actions.append(
                             GameAction(
                                 action_type=ActionType.SING_SONG,

@@ -397,25 +397,109 @@ def cmd_scan_tech(args: argparse.Namespace) -> None:
     print(f"[OK] Saved detailed tech scan report to {out_path}")
 
 
+def _resolve_deck_spec(spec: str) -> Deck:
+    decks = get_reference_meta_decks()
+    if Path(spec).exists():
+        return Deck.from_dreamborn_text(Path(spec).read_text(encoding="utf-8"), name=Path(spec).stem)
+    opt_slug = "princess_aggro" if "princess" in spec.lower() else ("circle_of_life" if "circle" in spec.lower() else "")
+    opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
+    if opt_file and opt_file.exists():
+        return Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{spec} (Optimized)")
+    _, base_d = get_archetype_core_and_baseline(spec)
+    if base_d is not None and spec.lower() in base_d.name.lower():
+        return base_d
+    return decks.get(spec) or next(
+        (d for k, d in decks.items() if spec.lower() in k.lower()),
+        list(decks.values())[0],
+    )
+
+
+def _format_board(state) -> str:
+    lines = [
+        f"Turn {state.turn_number} | Phase {state.phase} | Active P{state.active_player}",
+    ]
+    for pid, pl in enumerate(state.players):
+        chars = ", ".join(
+            f"{e.card.full_name}[{e.instance_id}] "
+            f"{e.effective_strength_with(pl, state.players[1-pid])}/"
+            f"{e.effective_willpower_with(pl, state.players[1-pid])} "
+            f"lore={e.effective_lore(pl, state.players[1-pid])} "
+            f"dmg={e.damage}{' E' if e.exerted else ''}{' D' if e.drying else ''}"
+            for e in pl.characters_in_play
+        ) or "(none)"
+        hand = ", ".join(f"{i}:{c.full_name}({c.cost})" for i, c in enumerate(pl.hand)) if pid == 0 else f"[{len(pl.hand)} cards]"
+        lines.append(
+            f"P{pid} lore={pl.lore} ink={pl.inkwell_available}/{pl.inkwell_total} drops={pl.ink_drops} "
+            f"deck={len(pl.deck)} discard={len(pl.discard)}"
+        )
+        lines.append(f"  Hand: {hand}")
+        lines.append(f"  Board: {chars}")
+    return "\n".join(lines)
+
+
+def cmd_playtest(args: argparse.Namespace) -> None:
+    """Interactive human (P0) vs heuristic (P1) text playtest with choice nodes."""
+    from lorcana_ai.agents.heuristic_agent import TacticalHeuristicAgent
+    from lorcana_ai.engine.game_state import GameState
+    from lorcana_ai.engine.move_generator import ActionType, MoveGenerator
+    from lorcana_ai.engine.simulator import LorcanaSimulator
+
+    deck_a = _resolve_deck_spec(args.deck_a)
+    deck_b = _resolve_deck_spec(args.deck_b)
+    state = GameState.create_new_game(
+        deck_a.expand_cards(),
+        deck_b.expand_cards(),
+        starting_player=args.starting_player,
+        know_opponent_inks=True,
+        seed=args.seed,
+    )
+    agent = TacticalHeuristicAgent(lookahead_depth=args.lookahead_depth)
+    LorcanaSimulator.interactive_choices = True
+    max_steps = max(50, args.max_steps)
+    print(f"[playtest] You=P0 ({deck_a.name}) vs Heuristic=P1 ({deck_b.name}) seed={args.seed}")
+    print("Enter action number. On CHOICE phase, pick a target or decline.")
+    try:
+        for step in range(max_steps):
+            if state.phase == "GAME_OVER":
+                print(f"GAME OVER winner=P{state.winner} reason={state.victory_reason}")
+                break
+            legal = MoveGenerator.generate_legal_actions(state)
+            if not legal:
+                print("No legal actions — forcing pass if possible.")
+                break
+            print("\n" + _format_board(state))
+            print("Legal actions:")
+            for i, act in enumerate(legal):
+                print(f"  [{i}] {act.action_type.value}: {act.description or act}")
+            if state.active_player == 0 or state.phase == "CHOICE":
+                raw = input("Your choice #> ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    print("Aborted.")
+                    break
+                try:
+                    idx = int(raw)
+                except ValueError:
+                    print("Enter a number.")
+                    continue
+                if not (0 <= idx < len(legal)):
+                    print("Out of range.")
+                    continue
+                LorcanaSimulator.step(state, legal[idx])
+            else:
+                act = agent.select_action(state, legal)
+                print(f"AI: {act.action_type.value}: {act.description}")
+                LorcanaSimulator.step(state, act)
+        else:
+            print(f"Stopped after {max_steps} steps (raise --max-steps to continue).")
+    finally:
+        LorcanaSimulator.interactive_choices = False
+
+
 def cmd_watch_game(args: argparse.Namespace) -> None:
     from lorcana_ai.engine.game_replay import simulate_and_format_replay
 
-    decks = get_reference_meta_decks()
-
     def _resolve_deck(spec: str) -> Deck:
-        if Path(spec).exists():
-            return Deck.from_dreamborn_text(Path(spec).read_text(encoding="utf-8"), name=Path(spec).stem)
-        opt_slug = "princess_aggro" if "princess" in spec.lower() else ("circle_of_life" if "circle" in spec.lower() else "")
-        opt_file = PROJECT_ROOT / "decks" / f"amber_emerald_{opt_slug}_optimized.txt" if opt_slug else None
-        if opt_file and opt_file.exists():
-            return Deck.from_dreamborn_text(opt_file.read_text(encoding="utf-8"), name=f"{spec} (Optimized)")
-        _, base_d = get_archetype_core_and_baseline(spec)
-        if base_d is not None and spec.lower() in base_d.name.lower():
-            return base_d
-        return decks.get(spec) or next(
-            (d for k, d in decks.items() if spec.lower() in k.lower()),
-            list(decks.values())[0],
-        )
+        return _resolve_deck_spec(spec)
 
     deck_a = _resolve_deck(args.deck_a)
     deck_b = _resolve_deck(args.deck_b)
@@ -515,6 +599,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt.add_argument("--lookahead-depth", type=int, default=1, help="Turn lookahead depth (0=greedy, 1=turn rollout, 2=turn+crackback)")
     p_opt.add_argument("--seed", type=int, default=2137)
 
+    p_play = sub.add_parser(
+        "playtest",
+        help="Interactive text playtest: human (P0) vs heuristic (P1); Dreamborn list or meta name; choice nodes",
+    )
+    p_play.add_argument("--deck-a", type=str, default="decks/amber_emerald_princess_aggro_optimized.txt", help="Your deck (.txt path or meta name)")
+    p_play.add_argument("--deck-b", type=str, default="Amber/Sapphire Detectives", help="Opponent deck (.txt path or meta name)")
+    p_play.add_argument("--starting-player", type=int, default=0, choices=[0, 1])
+    p_play.add_argument("--lookahead-depth", type=int, default=1)
+    p_play.add_argument("--max-steps", type=int, default=400)
+    p_play.add_argument("--seed", type=int, default=2137)
+
     p_watch = sub.add_parser(
         "watch-game",
         help="Simulate and display a complete turn-by-turn, action-by-action play-by-play transcript of a Lorcana match",
@@ -572,6 +667,8 @@ def main(argv: list[str] | None = None) -> None:
         cmd_sync_meta(args)
     elif args.command == "optimize-core":
         cmd_optimize_core(args)
+    elif args.command == "playtest":
+        cmd_playtest(args)
     elif args.command == "watch-game":
         cmd_watch_game(args)
     elif args.command == "train":

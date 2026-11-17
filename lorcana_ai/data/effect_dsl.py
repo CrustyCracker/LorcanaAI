@@ -77,9 +77,12 @@ class EffectOpType(str, Enum):
     DISCARD_OPP = "DISCARD_OPP"
     BUFF_ALLY_STR = "BUFF_ALLY_STR"
     BUFF_ALLY_LORE = "BUFF_ALLY_LORE"
+    BUFF_ALLY_WILLPOWER = "BUFF_ALLY_WILLPOWER"
     DEBUFF_OPP_STR = "DEBUFF_OPP_STR"
     HEAL_DRAW = "HEAL_DRAW"
+    HEAL = "HEAL"
     READY_CHAR = "READY_CHAR"
+    READY_ALL_CHARS = "READY_ALL_CHARS"
     BOOST_UNDER = "BOOST_UNDER"
     PLAY_COST1_CHAR_FREE = "PLAY_COST1_CHAR_FREE"
     FOG_CHALLENGES = "FOG_CHALLENGES"
@@ -95,6 +98,73 @@ class EffectOpType(str, Enum):
     BANISH_ITEM = "BANISH_ITEM"
     GIVE_ADVENTUROUS = "GIVE_ADVENTUROUS"
     GIVE_RUSH_EVASIVE = "GIVE_RUSH_EVASIVE"
+    SUPPORT_BUFF = "SUPPORT_BUFF"
+    LOOK_AT_TOP = "LOOK_AT_TOP"
+    GAIN_EVASIVE_SELF = "GAIN_EVASIVE_SELF"
+    PUT_CARD_UNDER_SELF = "PUT_CARD_UNDER_SELF"
+    NOOP_MARKED = "NOOP_MARKED"
+
+
+class ChoiceKind(str, Enum):
+    """Player decision required when resolving a clause (bots resolve via policy)."""
+    NONE = "NONE"
+    OPTIONAL_YES_NO = "OPTIONAL_YES_NO"  # "you may"
+    TARGET_ALLY_CHAR = "TARGET_ALLY_CHAR"
+    TARGET_OPP_CHAR = "TARGET_OPP_CHAR"
+    TARGET_ANY_CHAR = "TARGET_ANY_CHAR"
+    TARGET_ALLY_ITEM = "TARGET_ALLY_ITEM"
+    TARGET_ANY_ITEM = "TARGET_ANY_ITEM"
+    SUPPORT_TARGET = "SUPPORT_TARGET"
+    DISCARD_OWN = "DISCARD_OWN"
+    REANIMATE_DISCARD = "REANIMATE_DISCARD"
+
+
+class StatMod(str, Enum):
+    STRENGTH = "STRENGTH"
+    WILLPOWER = "WILLPOWER"
+    LORE = "LORE"
+    RESIST = "RESIST"
+    CHALLENGER = "CHALLENGER"
+
+
+class AuraFilter(str, Enum):
+    ALL_OTHER = "ALL_OTHER"
+    ALL = "ALL"
+    CLASSIFICATION = "CLASSIFICATION"
+    INK = "INK"
+    HAS_SUPPORT = "HAS_SUPPORT"
+    SELF = "SELF"
+
+
+@dataclass(frozen=True)
+class AuraStatic:
+    """Compiled continuous/static modifier — preferred over full_text.lower() hacks."""
+    strength: int = 0
+    willpower: int = 0
+    lore: int = 0
+    resist: int = 0
+    challenger: int = 0
+    grant_keywords: KeywordFlag = KeywordFlag.NONE
+    grant_singer: int | None = None
+    filter_kind: AuraFilter = AuraFilter.ALL_OTHER
+    filter_value: str = ""  # subtype or ink name
+    while_exerted: bool = False
+    while_your_turn: bool = False
+    while_condition: str = ""  # opaque tag for rare conditions
+    this_turn_only: bool = False  # quest-triggered temp auras use clauses instead
+    exclude_self: bool = True
+
+
+@dataclass(frozen=True)
+class ConditionalGrant:
+    """Conditional self-grant compiled from text (e.g. Amber Champion Singer 8)."""
+    grant_singer: int | None = None
+    grant_keywords: KeywordFlag = KeywordFlag.NONE
+    resist: int = 0
+    strength: int = 0
+    willpower: int = 0
+    lore: int = 0
+    condition: str = ""  # e.g. other_amber_ge_2, hand_empty, lore_behind, card_under
 
 
 @dataclass(frozen=True)
@@ -107,6 +177,11 @@ class EffectClause:
     cost_ink: int = 0
     requires_exert: bool = False
     requires_card_under: bool = False
+    optional: bool = False
+    choice_kind: ChoiceKind = ChoiceKind.NONE
+    target_filter: str = ""  # subtype / ink gate for chosen targets
+    classification: str = ""
+    unsupported_reason: str = ""
 
 
 @dataclass
@@ -129,6 +204,9 @@ class CompiledAbilities:
     has_five_songs_lore_bonus: bool = False
     deals_willpower_damage_in_challenges: bool = False
     clauses: list[EffectClause] = field(default_factory=list)
+    aura_statics: list[AuraStatic] = field(default_factory=list)
+    conditional_grants: list[ConditionalGrant] = field(default_factory=list)
+    unsupported_notes: list[str] = field(default_factory=list)
 
     def to_rust_bitflags(self) -> tuple[int, int]:
         """Packs abilities into fast integer bitflags and primary effect value for lorcana_rs."""
@@ -284,9 +362,13 @@ class EffectDSLCompiler:
         if m_st:
             abilities.sing_together_cost = int(m_st.group(1))
 
-        m_singer = cls._RE_SINGER.search(text)
-        if m_singer:
-            abilities.singer_cost = int(m_singer.group(1))
+        # Native Singer X (with reminder paren), NOT conditional "gains Singer X"
+        m_native_singer = re.search(r"(?<!gains\s)\bSinger\s+(\d+)\s*\(", text, re.IGNORECASE)
+        m_singer_plain = cls._RE_SINGER.search(text)
+        if m_native_singer:
+            abilities.singer_cost = int(m_native_singer.group(1))
+        elif m_singer_plain and "gains singer" not in lower:
+            abilities.singer_cost = int(m_singer_plain.group(1))
         elif card_type == "Character":
             abilities.singer_cost = cost
 
@@ -722,7 +804,741 @@ class EffectDSLCompiler:
             or ("chooses and discards" in lower and not is_self_loot)
         ):
             abilities.clauses.append(
-                EffectClause(trigger=default_trig, op=EffectOpType.DISCARD_OPP, amount=1)
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.DISCARD_OPP,
+                    amount=1,
+                    optional="you may" in lower and "opponent" not in lower.split("you may")[0][-20:],
+                    choice_kind=ChoiceKind.NONE,
+                )
             )
 
+        # J. Ready / Heal / Support / Look / Under-card / Evasive-self (wave families)
+        cls._compile_ready_heal_support(abilities, no_rem, lower, default_trig, default_exert, default_cost_ink)
+        cls._compile_aura_statics(abilities, text, no_rem, lower)
+        cls._compile_conditional_grants(abilities, text, no_rem, lower)
+        cls._compile_wave_families(abilities, no_rem, lower, default_trig, default_exert, default_cost_ink)
+        cls._annotate_choice_nodes(abilities, lower)
+
         return abilities
+
+    @classmethod
+    def _compile_wave_families(
+        cls,
+        abilities: CompiledAbilities,
+        no_rem: str,
+        lower: str,
+        default_trig: TriggerType,
+        default_exert: bool,
+        default_cost_ink: int,
+    ) -> None:
+        """Additional Sets 9–14 mechanic families toward near-zero empty non-reminder text."""
+
+        # Self heal at start of turn (Pluto - Determined Defender)
+        m_self_heal = re.search(r"at the start of your turn, remove up to (\d+) damage from this character", lower)
+        if m_self_heal:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.START_OF_TURN,
+                    op=EffectOpType.HEAL,
+                    amount=int(m_self_heal.group(1)),
+                    choice_kind=ChoiceKind.NONE,
+                    target_filter="self",
+                )
+            )
+
+        # Activated heal chosen (Cinderella - Gentle and Kind)
+        m_act_heal = re.search(r"⟳\s*[—\-]\s*remove up to (\d+) damage from chosen", lower)
+        if m_act_heal and not any(c.op == EffectOpType.HEAL and c.trigger == TriggerType.ACTIVATED for c in abilities.clauses):
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ACTIVATED,
+                    op=EffectOpType.HEAL,
+                    amount=int(m_act_heal.group(1)),
+                    requires_exert=True,
+                    optional=False,
+                    choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                    classification="Princess" if "princess" in lower else "",
+                )
+            )
+
+        # Banish chosen exerted with strength threshold (Minnie Sweetheart)
+        m_banish_ex = re.search(
+            r"banish chosen exerted character with (\d+)\s*(?:¤|\{S\}|strength)\s+or more",
+            lower,
+        )
+        if m_banish_ex:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_QUEST if "whenever this character quests" in lower else default_trig,
+                    op=EffectOpType.BANISH_CHAR,
+                    amount=1,
+                    threshold=-int(m_banish_ex.group(1)),  # negative => min strength (see BANISH_CHAR)
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.TARGET_OPP_CHAR,
+                    target_filter="exerted",
+                )
+            )
+
+        # Ready your other exerted [Class] characters (Moana)
+        if "ready your other exerted" in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_QUEST if "whenever this character quests" in lower else default_trig,
+                    op=EffectOpType.READY_ALL_CHARS,
+                    amount=1,
+                    optional="you may" in lower,
+                    classification="Princess" if "princess" in lower else "",
+                )
+            )
+
+        # Board-wide opposing strength debuff (Lost in the Woods)
+        m_all_debuff = re.search(
+            r"all opposing characters get -(\d+)\s*(?:¤|\{S\}|strength)",
+            lower,
+        )
+        if m_all_debuff:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.DEBUFF_OPP_STR,
+                    amount=int(m_all_debuff.group(1)),
+                    threshold=99,  # apply to all
+                )
+            )
+
+        # Move damage counters (Belle / Mama Odie)
+        m_move = re.search(r"move up to (\d+) damage counters? from chosen character to chosen opposing", lower)
+        if m_move and not any(c.op == EffectOpType.MOVE_DAMAGE for c in abilities.clauses):
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.MOVE_DAMAGE,
+                    amount=int(m_move.group(1)),
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.TARGET_ANY_CHAR,
+                )
+            )
+
+        # Exert up to N chosen characters (Elsa Spirit of Winter)
+        m_exert_n = re.search(r"exert up to (\d+) chosen characters?", lower)
+        if m_exert_n:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.EXERT_OPP_CHAR,
+                    amount=int(m_exert_n.group(1)),
+                    choice_kind=ChoiceKind.TARGET_ANY_CHAR,
+                )
+            )
+
+        # Chosen character gains Evasive (Dumbo)
+        if "chosen character gains evasive" in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.GAIN_EVASIVE_SELF,  # applied to chosen ally via choice path
+                    amount=1,
+                    choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                )
+            )
+
+        # Named-character Support grant as aura (Minnie → Mickey Mouse)
+        m_named = re.search(r"your characters named ([^.]+?) gain support", lower)
+        if m_named:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    grant_keywords=KeywordFlag.SUPPORT,
+                    filter_kind=AuraFilter.CLASSIFICATION,  # reuse filter_value as name match tag
+                    filter_value="name:" + m_named.group(1).strip().title(),
+                    exclude_self=False,
+                )
+            )
+
+        # Self +N strength per card in hand (Jafar Keeper)
+        m_hand_str = re.search(r"this character gets \+(\d+)\s*(?:¤|\{S\}|strength) for each card in your hand", lower)
+        if m_hand_str:
+            abilities.conditional_grants.append(
+                ConditionalGrant(strength=int(m_hand_str.group(1)), condition="per_card_in_hand")
+            )
+
+        # Your other characters with Rush gain Evasive (Peter Pan's Shadow)
+        if "your other characters with rush gain evasive" in lower:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    grant_keywords=KeywordFlag.EVASIVE,
+                    filter_kind=AuraFilter.CLASSIFICATION,
+                    filter_value="keyword:RUSH",
+                    exclude_self=True,
+                )
+            )
+
+        # Reveal top / put character in hand (Pongo) — approximate as LOOK_AT_TOP
+        if "reveal the top card of your deck" in lower and "character card" in lower:
+            if not any(c.op == EffectOpType.LOOK_AT_TOP for c in abilities.clauses):
+                abilities.clauses.append(
+                    EffectClause(
+                        trigger=TriggerType.ACTIVATED if "once during your turn" in lower else default_trig,
+                        op=EffectOpType.LOOK_AT_TOP,
+                        amount=1,
+                        cost_ink=2 if "pay 2" in lower else default_cost_ink,
+                        optional="you may" in lower,
+                        choice_kind=ChoiceKind.OPTIONAL_YES_NO,
+                    )
+                )
+
+        # Can't ready at start of next turn — mark unsupported residual with reason if only that
+        if "can't ready at the start of their next turn" in lower and not abilities.clauses:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.EXERT_OPP_CHAR,
+                    amount=1,
+                    choice_kind=ChoiceKind.TARGET_OPP_CHAR,
+                    unsupported_reason="persist-can't-ready approximated as exert",
+                )
+            )
+            abilities.unsupported_notes.append("can't-ready-next-turn approximated as exert")
+
+        # While this character has no damage → self statics
+        m_no_dmg = re.search(
+            r"while this character has no damage[^.]*gets?\s+([^.]{3,80})",
+            lower,
+        )
+        if m_no_dmg or "while this character has no damage" in lower:
+            body = m_no_dmg.group(1) if m_no_dmg else lower
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(body)
+            if "resist +" in body or "gains resist" in body:
+                m_r = re.search(r"resist\s*\+(\d+)", body)
+                if m_r:
+                    res_a = max(res_a, int(m_r.group(1)))
+            if str_a or will_a or lore_a or res_a:
+                abilities.aura_statics.append(
+                    AuraStatic(
+                        strength=str_a,
+                        willpower=will_a,
+                        lore=lore_a,
+                        resist=res_a,
+                        challenger=chal_a,
+                        filter_kind=AuraFilter.SELF,
+                        while_condition="no_damage",
+                        exclude_self=False,
+                    )
+                )
+
+        # While this character has damage
+        if "while this character has damage" in lower:
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(
+                lower.split("while this character has damage", 1)[1][:80]
+            )
+            if str_a or will_a or lore_a:
+                abilities.aura_statics.append(
+                    AuraStatic(
+                        strength=str_a,
+                        willpower=will_a,
+                        lore=lore_a,
+                        filter_kind=AuraFilter.SELF,
+                        while_condition="has_damage",
+                        exclude_self=False,
+                    )
+                )
+
+        # Location "while here" auras
+        if "while here" in lower:
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(lower)
+            grant_kw = KeywordFlag.NONE
+            if re.search(r"gain evasive", lower):
+                grant_kw |= KeywordFlag.EVASIVE
+            if str_a or will_a or lore_a or res_a or chal_a or grant_kw:
+                abilities.aura_statics.append(
+                    AuraStatic(
+                        strength=str_a,
+                        willpower=will_a,
+                        lore=lore_a,
+                        resist=res_a,
+                        challenger=chal_a,
+                        grant_keywords=grant_kw,
+                        filter_kind=AuraFilter.ALL,
+                        while_condition="at_this_location",
+                        exclude_self=False,
+                    )
+                )
+
+        # Enters play with N damage
+        m_enter_dmg = re.search(r"enters play with (\d+) damage", lower)
+        if m_enter_dmg:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_PLAY,
+                    op=EffectOpType.HEAL,  # reused: amount negative via threshold hack
+                    amount=0,
+                    threshold=int(m_enter_dmg.group(1)),
+                    target_filter="enter_damage",
+                    unsupported_reason="",
+                )
+            )
+
+        # Named character resist/bodyguard grants
+        m_named_resist = re.search(
+            r"your characters named ([^.]+?) gain resist\s*\+(\d+)",
+            lower,
+        )
+        if m_named_resist:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    resist=int(m_named_resist.group(2)),
+                    filter_kind=AuraFilter.CLASSIFICATION,
+                    filter_value="name:" + m_named_resist.group(1).strip().title(),
+                    exclude_self=False,
+                )
+            )
+        m_named_bg = re.search(r"your characters named ([^.]+?) gain bodyguard", lower)
+        if m_named_bg:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    grant_keywords=KeywordFlag.BODYGUARD,
+                    filter_kind=AuraFilter.CLASSIFICATION,
+                    filter_value="name:" + m_named_bg.group(1).strip().title(),
+                    exclude_self=False,
+                )
+            )
+
+        # Self +N lore/str per location / per opp hand
+        m_per_loc = re.search(
+            r"this character gets \+(\d+)\s*(?:◊|\{L\}|lore) for each location",
+            lower,
+        )
+        if m_per_loc:
+            abilities.conditional_grants.append(
+                ConditionalGrant(lore=int(m_per_loc.group(1)), condition="per_location")
+            )
+        m_per_opp_hand = re.search(
+            r"this character gets \+(\d+)\s*(?:¤|\{S\}|strength) for each card in opponents'? hands?",
+            lower,
+        )
+        if m_per_opp_hand:
+            abilities.conditional_grants.append(
+                ConditionalGrant(strength=int(m_per_opp_hand.group(1)), condition="per_opp_hand")
+            )
+
+        # During your turn self +str (Pacha)
+        m_turn_str = re.search(
+            r"during your turn, this character gets \+(\d+)\s*(?:¤|\{S\}|strength)",
+            lower,
+        )
+        if m_turn_str:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    strength=int(m_turn_str.group(1)),
+                    filter_kind=AuraFilter.SELF,
+                    while_your_turn=True,
+                    exclude_self=False,
+                )
+            )
+
+    @classmethod
+    def _parse_stat_amounts(cls, fragment: str) -> tuple[int, int, int, int, int]:
+        """Return (str, will, lore, resist, challenger) deltas from a text fragment."""
+        strength = willpower = lore = resist = challenger = 0
+        for m in re.finditer(r"\+(\d+)\s*(?:¤|\{S\}|strength)", fragment, re.I):
+            strength += int(m.group(1))
+        for m in re.finditer(r"\+(\d+)\s*(?:⛉|\{W\}|willpower)", fragment, re.I):
+            willpower += int(m.group(1))
+        for m in re.finditer(r"\+(\d+)\s*(?:◊|\{L\}|lore)", fragment, re.I):
+            lore += int(m.group(1))
+        # Generic "+1 ¤ and +1 ⛉" already covered; also bare "+1 ◊ this turn"
+        for m in re.finditer(r"resist\s*\+(\d+)", fragment, re.I):
+            resist += int(m.group(1))
+        for m in re.finditer(r"challenger\s*\+(\d+)", fragment, re.I):
+            challenger += int(m.group(1))
+        return strength, willpower, lore, resist, challenger
+
+    @classmethod
+    def _compile_ready_heal_support(
+        cls,
+        abilities: CompiledAbilities,
+        no_rem: str,
+        lower: str,
+        default_trig: TriggerType,
+        default_exert: bool,
+        default_cost_ink: int,
+    ) -> None:
+        if "ready all your characters" in lower or "ready all characters" in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.READY_ALL_CHARS,
+                    amount=1,
+                    cost_ink=default_cost_ink,
+                    requires_exert=default_exert,
+                )
+            )
+        elif "ready chosen character" in lower or "ready another chosen character" in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.READY_CHAR,
+                    amount=1,
+                    cost_ink=default_cost_ink,
+                    requires_exert=default_exert,
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                )
+            )
+
+        m_heal = re.search(r"remove up to (\d+) damage from chosen character", lower)
+        m_heal_all = re.search(r"remove all damage from chosen character", lower)
+        if m_heal_all and "draw" not in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.HEAL,
+                    amount=99,
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.TARGET_ALLY_CHAR,
+                )
+            )
+        elif m_heal and not any(c.op == EffectOpType.HEAL_DRAW for c in abilities.clauses):
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.HEAL,
+                    amount=int(m_heal.group(1)),
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.TARGET_ANY_CHAR,
+                )
+            )
+
+        # Support (CR 8.13): resolved at quest-time as a choice node in the simulator
+        # (not a DSL clause — avoids double-fire with ON_QUEST). Marked via keyword flag.
+
+        if "look at the top" in lower and not any(c.op == EffectOpType.LOOK_AT_TOP for c in abilities.clauses):
+            m_n = re.search(r"look at the top (\d+|card)", lower)
+            n = 1
+            if m_n and m_n.group(1).isdigit():
+                n = int(m_n.group(1))
+            # Prefer LOOK_AT_TOP over generic DRAW if we only had the look/put heuristic
+            abilities.clauses = [
+                c for c in abilities.clauses
+                if not (c.op == EffectOpType.DRAW and c.amount == 1 and "look at the top" in lower)
+            ]
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=default_trig,
+                    op=EffectOpType.LOOK_AT_TOP,
+                    amount=n,
+                    optional="you may" in lower,
+                    choice_kind=ChoiceKind.OPTIONAL_YES_NO if "you may" in lower else ChoiceKind.NONE,
+                )
+            )
+
+        if "put the top card of your deck facedown under" in lower:
+            abilities.clauses.append(
+                EffectClause(
+                    trigger=TriggerType.ON_QUEST if "whenever this character quests" in lower else default_trig,
+                    op=EffectOpType.PUT_CARD_UNDER_SELF,
+                    amount=1,
+                )
+            )
+
+        if "during your turn, this character gains evasive" in lower:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    grant_keywords=KeywordFlag.EVASIVE,
+                    filter_kind=AuraFilter.SELF,
+                    while_your_turn=True,
+                    exclude_self=False,
+                )
+            )
+
+    @classmethod
+    def _compile_aura_statics(
+        cls,
+        abilities: CompiledAbilities,
+        text: str,
+        no_rem: str,
+        lower: str,
+    ) -> None:
+        # Continuous auras: "Your [other] [Class|Ink] characters get/gain ..."
+        # Skip quest-triggered "get +X this turn" — those are temp buffs via clauses.
+        aura_pat = re.compile(
+            r"your\s+(other\s+)?(?:(\w+(?:\s+\w+)?)\s+)?"
+            r"characters?\s+"
+            r"(get|gain|gains)\s+([^.]{3,120})",
+            re.I,
+        )
+        for m in aura_pat.finditer(no_rem):
+            frag = m.group(0)
+            frag_l = frag.lower()
+            if "this turn" in frag_l and ("whenever" in lower or "when you play" in lower):
+                # Temporary triggered buff — compile as clause when possible
+                str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(frag)
+                trig = TriggerType.ON_QUEST if "whenever this character quests" in lower else TriggerType.ON_PLAY
+                if lore_a and not any(c.op == EffectOpType.BUFF_ALLY_LORE and c.trigger == trig for c in abilities.clauses):
+                    abilities.clauses.append(
+                        EffectClause(
+                            trigger=trig,
+                            op=EffectOpType.BUFF_ALLY_LORE,
+                            amount=lore_a,
+                            classification=(m.group(2) or "").strip(),
+                            choice_kind=ChoiceKind.NONE,
+                        )
+                    )
+                if str_a and not any(c.op == EffectOpType.BUFF_ALLY_STR and c.trigger == trig for c in abilities.clauses):
+                    abilities.clauses.append(
+                        EffectClause(
+                            trigger=trig,
+                            op=EffectOpType.BUFF_ALLY_STR,
+                            amount=str_a,
+                            classification=(m.group(2) or "").strip(),
+                        )
+                    )
+                continue
+
+            other = bool(m.group(1))
+            class_or_ink = (m.group(2) or "").strip()
+            verb = m.group(3).lower()
+            rest = m.group(4)
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(rest)
+            grant_kw = KeywordFlag.NONE
+            if re.search(r"\bward\b", rest, re.I):
+                grant_kw |= KeywordFlag.WARD
+            if re.search(r"\bsupport\b", rest, re.I):
+                grant_kw |= KeywordFlag.SUPPORT
+            if re.search(r"\bevasive\b", rest, re.I):
+                grant_kw |= KeywordFlag.EVASIVE
+            if re.search(r"\balert\b", rest, re.I):
+                grant_kw |= KeywordFlag.ALERT
+            if re.search(r"\brush\b", rest, re.I):
+                grant_kw |= KeywordFlag.RUSH
+
+            filter_kind = AuraFilter.ALL_OTHER if other else AuraFilter.ALL
+            filter_value = ""
+            ink_names = {"Amber", "Amethyst", "Emerald", "Ruby", "Sapphire", "Steel"}
+            if class_or_ink:
+                titled = " ".join(w.capitalize() for w in class_or_ink.split())
+                if titled in ink_names:
+                    filter_kind = AuraFilter.INK
+                    filter_value = titled
+                elif class_or_ink.lower() == "other":
+                    filter_kind = AuraFilter.ALL_OTHER
+                else:
+                    filter_kind = AuraFilter.CLASSIFICATION
+                    filter_value = titled
+
+            # Genie-style: aura only while exerted when the while-clause scopes this fragment
+            while_exerted = False
+            if "while this character is exerted" in lower:
+                m_ex = re.search(
+                    r"while this character is exerted[^.]*your other characters (?:get|gain)",
+                    lower,
+                    re.I,
+                )
+                while_exerted = bool(m_ex) and (
+                    "your other characters get" in frag_l or "your other characters gain" in frag_l
+                )
+
+            if str_a or will_a or lore_a or res_a or chal_a or grant_kw:
+                abilities.aura_statics.append(
+                    AuraStatic(
+                        strength=str_a,
+                        willpower=will_a,
+                        lore=lore_a,
+                        resist=res_a,
+                        challenger=chal_a,
+                        grant_keywords=grant_kw,
+                        filter_kind=filter_kind,
+                        filter_value=filter_value,
+                        while_exerted=while_exerted and "while this character is exerted" in lower,
+                        while_your_turn="during your turn" in lower and "your" in frag_l,
+                        exclude_self=other or filter_kind != AuraFilter.ALL,
+                    )
+                )
+
+        # "Your characters with Support get +1 ◊"
+        if "your characters with support get" in lower:
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(
+                lower.split("your characters with support get", 1)[1][:40]
+            )
+            abilities.aura_statics.append(
+                AuraStatic(
+                    strength=str_a,
+                    willpower=will_a,
+                    lore=lore_a or 1,
+                    resist=res_a,
+                    challenger=chal_a,
+                    filter_kind=AuraFilter.HAS_SUPPORT,
+                    exclude_self=False,
+                )
+            )
+
+        # Self statics: "this character gets +X while ..."
+        self_pat = re.compile(
+            r"while ([^.]{5,100}), this (?:character|location) gets?\s+([^.]{3,80})",
+            re.I,
+        )
+        for m in self_pat.finditer(no_rem):
+            cond = m.group(1).lower()
+            rest = m.group(2)
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(rest)
+            cond_tag = ""
+            if "card under" in cond:
+                cond_tag = "card_under"
+            elif "no cards in your hand" in cond:
+                cond_tag = "hand_empty"
+            elif "opponent has more lore" in cond:
+                cond_tag = "lore_behind"
+            elif "villain character in play" in cond:
+                cond_tag = "villain_in_play"
+            elif "10 or more cards in your discard" in cond:
+                cond_tag = "discard_ge_10"
+            elif "exerted" in cond:
+                cond_tag = "self_exerted"
+            else:
+                cond_tag = "misc:" + cond[:40]
+            if str_a or will_a or lore_a or res_a:
+                abilities.aura_statics.append(
+                    AuraStatic(
+                        strength=str_a,
+                        willpower=will_a,
+                        lore=lore_a,
+                        resist=res_a,
+                        challenger=chal_a,
+                        filter_kind=AuraFilter.SELF,
+                        while_condition=cond_tag,
+                        exclude_self=False,
+                    )
+                )
+            if "resist +" in rest.lower():
+                m_r = re.search(r"resist\s*\+(\d+)", rest, re.I)
+                if m_r:
+                    abilities.conditional_grants.append(
+                        ConditionalGrant(resist=int(m_r.group(1)), condition=cond_tag)
+                    )
+
+        # Debuff auras on opposing damaged while self exerted (Karnage)
+        if "each opposing damaged character gets -1" in lower:
+            abilities.aura_statics.append(
+                AuraStatic(
+                    lore=-1,
+                    filter_kind=AuraFilter.ALL,
+                    while_exerted=True,
+                    while_condition="opp_damaged_debuff",
+                    exclude_self=True,
+                )
+            )
+
+    @classmethod
+    def _compile_conditional_grants(
+        cls,
+        abilities: CompiledAbilities,
+        text: str,
+        no_rem: str,
+        lower: str,
+    ) -> None:
+        # Mickey Mouse - Amber Champion: Singer 8 while 2+ other Amber
+        if "gains singer" in lower and "other amber" in lower:
+            m = re.search(r"gains singer (\d+)", lower)
+            if m:
+                abilities.conditional_grants.append(
+                    ConditionalGrant(grant_singer=int(m.group(1)), condition="other_amber_ge_2")
+                )
+        # Hand-empty resist
+        if "while you have no cards in your hand" in lower and "resist" in lower:
+            m = re.search(r"resist\s*\+(\d+)", lower)
+            if m:
+                abilities.conditional_grants.append(
+                    ConditionalGrant(resist=int(m.group(1)), condition="hand_empty")
+                )
+        # Card-under keyword grants
+        if "while there's a card under this character" in lower:
+            kw = KeywordFlag.NONE
+            if "gains evasive" in lower:
+                kw |= KeywordFlag.EVASIVE
+            str_a, will_a, lore_a, res_a, chal_a = (0, 0, 0, 0, 0)
+            # Parse "+N" after the while clause
+            m_body = re.search(
+                r"while there's a card under this character[^.]*\.\s*([^.]*)",
+                no_rem,
+                re.I,
+            )
+            body = m_body.group(1) if m_body else no_rem
+            str_a, will_a, lore_a, res_a, chal_a = cls._parse_stat_amounts(body)
+            if "resist +" in lower:
+                m_r = re.search(r"resist\s*\+(\d+)", lower)
+                if m_r:
+                    res_a = max(res_a, int(m_r.group(1)))
+            abilities.conditional_grants.append(
+                ConditionalGrant(
+                    grant_keywords=kw,
+                    strength=str_a,
+                    willpower=will_a,
+                    lore=lore_a,
+                    resist=res_a,
+                    condition="card_under",
+                )
+            )
+
+    @classmethod
+    def _annotate_choice_nodes(cls, abilities: CompiledAbilities, lower: str) -> None:
+        """Stamp choice_kind / optional on clauses that need player decisions."""
+        annotated: list[EffectClause] = []
+        for c in abilities.clauses:
+            if c.choice_kind != ChoiceKind.NONE or c.optional:
+                annotated.append(c)
+                continue
+            opt = c.optional
+            kind = c.choice_kind
+            # Infer from op
+            if c.op in (
+                EffectOpType.BANISH_CHAR,
+                EffectOpType.BANISH_LOW_STR_CHAR,
+                EffectOpType.DEAL_DAMAGE,
+                EffectOpType.EXERT_OPP_CHAR,
+                EffectOpType.BOUNCE_OPP_CHAR,
+                EffectOpType.DEBUFF_OPP_STR,
+                EffectOpType.INK_OPP_CHAR,
+            ):
+                kind = ChoiceKind.TARGET_OPP_CHAR
+            elif c.op in (
+                EffectOpType.BOUNCE_OWN_CHAR,
+                EffectOpType.READY_CHAR,
+                EffectOpType.BUFF_ALLY_STR,
+                EffectOpType.BUFF_ALLY_LORE,
+                EffectOpType.BUFF_ALLY_WILLPOWER,
+                EffectOpType.MOVE_DAMAGE,
+                EffectOpType.GIVE_ADVENTUROUS,
+                EffectOpType.GIVE_RUSH_EVASIVE,
+            ):
+                kind = ChoiceKind.TARGET_ALLY_CHAR
+            elif c.op in (EffectOpType.HEAL, EffectOpType.HEAL_DRAW):
+                kind = ChoiceKind.TARGET_ANY_CHAR
+            elif c.op in (EffectOpType.BANISH_ITEM, EffectOpType.INK_ITEM):
+                kind = ChoiceKind.TARGET_ANY_ITEM
+            elif c.op == EffectOpType.REANIMATE_CHAR:
+                kind = ChoiceKind.REANIMATE_DISCARD
+            elif c.op == EffectOpType.SUPPORT_BUFF:
+                kind = ChoiceKind.SUPPORT_TARGET
+                opt = True
+            if "you may" in lower and kind != ChoiceKind.NONE:
+                opt = True
+            if kind != c.choice_kind or opt != c.optional:
+                annotated.append(
+                    EffectClause(
+                        trigger=c.trigger,
+                        op=c.op,
+                        amount=c.amount,
+                        threshold=c.threshold,
+                        cost_ink=c.cost_ink,
+                        requires_exert=c.requires_exert,
+                        requires_card_under=c.requires_card_under,
+                        optional=opt,
+                        choice_kind=kind,
+                        target_filter=c.target_filter,
+                        classification=c.classification,
+                        unsupported_reason=c.unsupported_reason,
+                    )
+                )
+            else:
+                annotated.append(c)
+        abilities.clauses = annotated

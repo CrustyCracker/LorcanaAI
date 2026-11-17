@@ -14,7 +14,7 @@ import random
 from typing import Sequence
 
 from lorcana_ai.data.card_db import CardTemplate
-from lorcana_ai.data.effect_dsl import KeywordFlag
+from lorcana_ai.data.effect_dsl import AuraFilter, AuraStatic, ConditionalGrant, KeywordFlag
 
 
 @dataclass
@@ -28,6 +28,7 @@ class BoardEntity:
     temp_strength_mod: int = 0
     temp_challenger_mod: int = 0
     temp_lore_mod: int = 0
+    temp_willpower_mod: int = 0
     cards_under_count: int = 0
     boosted_this_turn: bool = False
     temp_evasive: bool = False
@@ -36,53 +37,206 @@ class BoardEntity:
     shifted_under_cards: list[CardTemplate] = field(default_factory=list)
     location_instance_id: int = -1
 
+    def _condition_met(
+        self,
+        condition: str,
+        owner: PlayerState | None,
+        opp: PlayerState | None,
+        source: BoardEntity | None = None,
+    ) -> bool:
+        src = source or self
+        if not condition:
+            return True
+        if condition == "card_under":
+            return src.cards_under_count > 0
+        if condition == "hand_empty":
+            return owner is not None and len(owner.hand) == 0
+        if condition == "lore_behind":
+            return owner is not None and opp is not None and opp.lore > owner.lore
+        if condition == "villain_in_play":
+            return owner is not None and any("Villain" in e.card.subtypes for e in owner.characters_in_play)
+        if condition == "discard_ge_10":
+            return owner is not None and len(owner.discard) >= 10
+        if condition == "self_exerted":
+            return src.exerted
+        if condition == "other_amber_ge_2":
+            if owner is None:
+                return False
+            return (
+                sum(
+                    1
+                    for e in owner.characters_in_play
+                    if e.instance_id != src.instance_id and "Amber" in e.card.inks
+                )
+                >= 2
+            )
+        if condition == "opp_damaged_debuff":
+            return True
+        if condition == "per_card_in_hand":
+            return owner is not None and len(owner.hand) > 0
+        if condition == "no_damage":
+            return self.damage == 0
+        if condition == "has_damage":
+            return self.damage > 0
+        if condition == "per_location":
+            return owner is not None and len(owner.locations_in_play) > 0
+        if condition == "per_opp_hand":
+            return opp is not None and len(opp.hand) > 0
+        if condition == "at_this_location":
+            # Applied only when character.location_instance_id matches aura source
+            return True
+        if condition.startswith("misc:"):
+            return False
+        return False
+
+    def _aura_targets_self(self, aura: AuraStatic, source: BoardEntity, owner: PlayerState) -> bool:
+        if aura.filter_kind == AuraFilter.SELF:
+            return source.instance_id == self.instance_id
+        if aura.exclude_self and source.instance_id == self.instance_id:
+            return False
+        if aura.filter_kind == AuraFilter.HAS_SUPPORT:
+            return self.has_keyword(KeywordFlag.SUPPORT, owner=owner, check_auras=False)
+        if aura.filter_kind == AuraFilter.INK:
+            return aura.filter_value in self.card.inks
+        if aura.filter_kind == AuraFilter.CLASSIFICATION:
+            fv = aura.filter_value
+            if fv.startswith("name:"):
+                return self.card.base_name.lower() == fv[5:].lower()
+            if fv.startswith("keyword:"):
+                try:
+                    flag = KeywordFlag[fv.split(":", 1)[1].upper()]
+                except KeyError:
+                    return False
+                return self.has_keyword(flag, owner=owner, check_auras=False)
+            return any(s.lower() == fv.lower() for s in self.card.subtypes)
+        if aura.filter_kind in (AuraFilter.ALL, AuraFilter.ALL_OTHER):
+            return True
+        return False
+
+    def _iter_relevant_auras(
+        self,
+        owner: PlayerState | None,
+        opp: PlayerState | None,
+        *,
+        for_opp_debuff: bool = False,
+    ):
+        if owner is None:
+            return
+        # Own auras
+        for src in owner.board:
+            for aura in src.card.abilities.aura_statics:
+                if aura.while_condition == "opp_damaged_debuff":
+                    continue
+                if aura.while_exerted and not src.exerted:
+                    continue
+                if aura.while_your_turn and owner is None:
+                    continue
+                if aura.while_condition == "at_this_location":
+                    if src.card.card_type != "Location" or self.location_instance_id != src.instance_id:
+                        continue
+                elif aura.while_condition and not self._condition_met(aura.while_condition, owner, opp, source=src):
+                    continue
+                if self._aura_targets_self(aura, src, owner):
+                    yield aura
+            for grant in src.card.abilities.conditional_grants:
+                if src.instance_id != self.instance_id:
+                    continue
+                if self._condition_met(grant.condition, owner, opp, source=src):
+                    yield grant
+        # Opposing debuff auras (Karnage-style)
+        if for_opp_debuff and opp is not None and self.damage > 0:
+            for src in opp.characters_in_play:
+                for aura in src.card.abilities.aura_statics:
+                    if aura.while_condition != "opp_damaged_debuff":
+                        continue
+                    if aura.while_exerted and not src.exerted:
+                        continue
+                    yield aura
+
+    def _stat_from_auras(
+        self,
+        owner: PlayerState | None,
+        opp: PlayerState | None,
+        attr: str,
+    ) -> int:
+        total = 0
+        for item in self._iter_relevant_auras(owner, opp, for_opp_debuff=(attr == "lore")):
+            if isinstance(item, AuraStatic):
+                total += getattr(item, attr, 0)
+            elif isinstance(item, ConditionalGrant):
+                amt = getattr(item, attr, 0)
+                if item.condition == "per_card_in_hand" and owner is not None:
+                    total += amt * len(owner.hand)
+                elif item.condition == "per_location" and owner is not None:
+                    total += amt * len(owner.locations_in_play)
+                elif item.condition == "per_opp_hand" and opp is not None:
+                    total += amt * len(opp.hand)
+                else:
+                    total += amt
+        return total
+
     @property
     def effective_strength(self) -> int:
+        # Without owner context, only self conditional grants with card_under
         val = self.card.strength + self.temp_strength_mod
-        if self.cards_under_count > 0:
-            txt_lower = self.card.full_text.lower()
-            if "while there's a card under this character" in txt_lower:
-                if "+3 ¤" in txt_lower or "+3 strength" in txt_lower:
-                    val += 3
-                elif "+2 ¤" in txt_lower or "+2 strength" in txt_lower:
-                    val += 2
-                elif "+1 ¤" in txt_lower or "+1 strength" in txt_lower:
-                    val += 1
+        for grant in self.card.abilities.conditional_grants:
+            if grant.condition == "card_under" and self.cards_under_count > 0:
+                val += grant.strength
+        return max(0, val)
+
+    def effective_strength_with(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
+        val = self.card.strength + self.temp_strength_mod
+        val += self._stat_from_auras(owner, opp, "strength")
+        if owner is None:
+            for grant in self.card.abilities.conditional_grants:
+                if grant.condition == "card_under" and self.cards_under_count > 0:
+                    val += grant.strength
         return max(0, val)
 
     @property
     def effective_willpower(self) -> int:
-        val = self.card.willpower
-        if self.cards_under_count > 0:
-            txt_lower = self.card.full_text.lower()
-            if "while there's a card under this character" in txt_lower:
-                if "+2 ⛉" in txt_lower or "+2 willpower" in txt_lower:
-                    val += 2
-                elif "+1 ⛉" in txt_lower or "+1 willpower" in txt_lower:
-                    val += 1
+        val = self.card.willpower + self.temp_willpower_mod
+        for grant in self.card.abilities.conditional_grants:
+            if grant.condition == "card_under" and self.cards_under_count > 0:
+                val += grant.willpower
+        return max(1, val)
+
+    def effective_willpower_with(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
+        val = self.card.willpower + self.temp_willpower_mod
+        val += self._stat_from_auras(owner, opp, "willpower")
+        if owner is None:
+            for grant in self.card.abilities.conditional_grants:
+                if grant.condition == "card_under" and self.cards_under_count > 0:
+                    val += grant.willpower
         return max(1, val)
 
     @property
     def is_banished(self) -> bool:
         return self.damage >= self.effective_willpower
 
-    def effective_resist(self, owner: PlayerState | None = None) -> int:
+    def effective_resist(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
         base = self.card.abilities.resist_bonus
-        txt_lower = self.card.full_text.lower()
-        if self.cards_under_count > 0 and "while there's a card under this character" in txt_lower:
-            if "resist +2" in txt_lower:
-                base += 2
-            elif "resist +1" in txt_lower:
-                base += 1
-        if owner is not None:
-            if "while you have no cards in your hand, this character gains resist +2" in txt_lower and len(owner.hand) == 0:
-                base += 2
-            has_lead = any("your detective characters gain alert and resist +2" in e.card.full_text.lower() for e in owner.characters_in_play)
-            if has_lead and "Detective" in self.card.subtypes:
-                base += 2
+        base += self._stat_from_auras(owner, opp, "resist")
+        if owner is None:
+            for grant in self.card.abilities.conditional_grants:
+                if grant.condition == "card_under" and self.cards_under_count > 0:
+                    base += grant.resist
+        # Detective Lead lateral-thinking aura via compiled auras (Alert+Resist on Detectives)
+        if owner is not None and "Detective" in self.card.subtypes:
+            for src in owner.characters_in_play:
+                for aura in src.card.abilities.aura_statics:
+                    if aura.filter_kind == AuraFilter.CLASSIFICATION and aura.filter_value.lower() == "detective":
+                        if aura.while_your_turn:
+                            base += aura.resist
         return max(0, base)
 
-    def has_keyword(self, kw: KeywordFlag | str) -> bool:
+    def has_keyword(
+        self,
+        kw: KeywordFlag | str,
+        owner: PlayerState | None = None,
+        opp: PlayerState | None = None,
+        check_auras: bool = True,
+    ) -> bool:
         if isinstance(kw, str):
             try:
                 flag = KeywordFlag[kw.upper()]
@@ -97,54 +251,28 @@ class BoardEntity:
             return True
         if bool(self.card.abilities.keywords & flag):
             return True
-        # Ursula - Whisper of Vanessa (Set 10)
-        if self.cards_under_count > 0 and "while there's a card under this character" in self.card.full_text.lower():
-            txt_lower = self.card.full_text.lower()
-            if flag == KeywordFlag.EVASIVE and "gains evasive" in txt_lower:
-                return True
+        for grant in self.card.abilities.conditional_grants:
+            if grant.grant_keywords & flag:
+                if self._condition_met(grant.condition, owner, opp):
+                    return True
+        if check_auras and owner is not None:
+            for item in self._iter_relevant_auras(owner, opp):
+                if isinstance(item, AuraStatic) and (item.grant_keywords & flag):
+                    return True
         return False
 
     def effective_lore(self, owner: PlayerState | None = None, opp: PlayerState | None = None) -> int:
         base = self.card.lore + self.temp_lore_mod
-        txt_lower = self.card.full_text.lower()
-        # Static bonuses from cards under this character (Ursula, Flynn Rider, Megara, Kanga)
-        if self.cards_under_count > 0 and "while there's a card under this character" in txt_lower:
-            if "+2 ◊" in txt_lower or "gets +2 ◊" in txt_lower:
-                base += 2
-            elif "+1 ◊" in txt_lower or "gets +1" in txt_lower:
-                base += 1
-        if owner is not None:
-            if self.card.abilities.has_five_songs_lore_bonus:
-                songs_in_discard = sum(1 for c in owner.discard if c.is_song)
-                if songs_in_discard >= 5:
-                    base += 3
-            # Diablo - Stone Servant (Set 12): +2 ¤ and +1 ◊ while you have a Villain character in play
-            if "while you have a villain character in play" in txt_lower:
-                if any("Villain" in e.card.subtypes for e in owner.characters_in_play):
-                    base += 1
-            # Land of the Dead - Marigold Bridge (Set 14): +2 ◊ while 10+ cards in discard
-            if "while you have 10 or more cards in your discard, this location gets +2" in txt_lower:
-                if len(owner.discard) >= 10:
-                    base += 2
-            # Gadget Hackwrench - Resourceful Mechanic (Set 12): "Your characters with Support get +1 ◊."
-            if self.has_keyword(KeywordFlag.SUPPORT):
-                gadget_cnt = sum(
-                    1 for e in owner.characters_in_play if "your characters with support get +1" in e.card.full_text.lower()
-                )
-                base += gadget_cnt
-        if opp is not None:
-            # The Queen - Devious Disguise (Set 12): "While an opponent has more lore than you, this character gets +2 ◊."
-            if owner is not None and "while an opponent has more lore than you, this character gets +2" in txt_lower:
-                if opp.lore > owner.lore:
-                    base += 2
-            # Don Karnage - Debonair Pirate (Set 14): "While this character is exerted, each opposing damaged character gets -1 ◊."
-            if self.damage > 0:
-                karnage_debuff = sum(
-                    1
-                    for e in opp.characters_in_play
-                    if e.exerted and "each opposing damaged character gets -1" in e.card.full_text.lower()
-                )
-                base -= karnage_debuff
+        base += self._stat_from_auras(owner, opp, "lore")
+        if owner is not None and self.card.abilities.has_five_songs_lore_bonus:
+            songs_in_discard = sum(1 for c in owner.discard if c.is_song)
+            if songs_in_discard >= 5:
+                base += 3
+        # Villain-in-play strength bump is separate; lore from compiled auras covers Diablo etc.
+        if owner is None:
+            for grant in self.card.abilities.conditional_grants:
+                if grant.condition == "card_under" and self.cards_under_count > 0:
+                    base += grant.lore
         return max(0, base)
 
     def can_quest(self) -> bool:
@@ -171,11 +299,18 @@ class BoardEntity:
             return False
         return True
 
-    def can_sing(self, song_cost: int) -> bool:
+    def effective_singer_cost(self, owner: PlayerState | None = None) -> int:
+        """Printed Singer X, plus conditional Singer grants (e.g. Mickey Mouse - Amber Champion)."""
+        singer_val = self.card.abilities.singer_cost or self.card.cost
+        for grant in self.card.abilities.conditional_grants:
+            if grant.grant_singer is not None and self._condition_met(grant.condition, owner, None):
+                singer_val = max(singer_val, grant.grant_singer)
+        return singer_val
+
+    def can_sing(self, song_cost: int, owner: PlayerState | None = None) -> bool:
         if self.card.card_type != "Character" or self.exerted or self.drying:
             return False
-        singer_val = self.card.abilities.singer_cost or self.card.cost
-        return singer_val >= song_cost
+        return self.effective_singer_cost(owner) >= song_cost
 
     def clone(self) -> BoardEntity:
         return BoardEntity(
@@ -187,6 +322,7 @@ class BoardEntity:
             temp_strength_mod=self.temp_strength_mod,
             temp_challenger_mod=self.temp_challenger_mod,
             temp_lore_mod=self.temp_lore_mod,
+            temp_willpower_mod=self.temp_willpower_mod,
             cards_under_count=self.cards_under_count,
             boosted_this_turn=self.boosted_this_turn,
             temp_evasive=self.temp_evasive,
@@ -341,6 +477,19 @@ class PlayerState:
 
 
 @dataclass
+class PendingChoice:
+    """In-flight player choice from an effect clause (you may / chosen target / Support)."""
+    controller_id: int
+    choice_kind: str
+    source_instance_id: int = -1
+    clause_op: str = ""
+    amount: int = 0
+    optional: bool = False
+    candidate_ids: tuple[int, ...] = ()  # board instance ids or hand/discard indices encoded
+    prompt: str = ""
+
+
+@dataclass
 class GameState:
     """
     Complete state of a 1v1 Disney Lorcana game.
@@ -350,11 +499,13 @@ class GameState:
     active_player: int = 0
     starting_player: int = 0
     turn_number: int = 1
-    phase: str = "MULLIGAN_P0"  # "MULLIGAN_P0", "MULLIGAN_P1", "MAIN", "GAME_OVER"
+    phase: str = "MULLIGAN_P0"  # "MULLIGAN_P0", "MULLIGAN_P1", "MAIN", "GAME_OVER", "CHOICE"
     winner: int | None = None
     victory_reason: str = ""
     next_instance_id: int = 1
     known_opponent_inks: tuple[tuple[str, ...], tuple[str, ...]] = ((), ())
+    pending_choice: PendingChoice | None = None
+    phase_before_choice: str = "MAIN"
 
     @classmethod
     def create_new_game(
@@ -391,6 +542,18 @@ class GameState:
         )
 
     def clone(self) -> GameState:
+        pc = None
+        if self.pending_choice is not None:
+            pc = PendingChoice(
+                controller_id=self.pending_choice.controller_id,
+                choice_kind=self.pending_choice.choice_kind,
+                source_instance_id=self.pending_choice.source_instance_id,
+                clause_op=self.pending_choice.clause_op,
+                amount=self.pending_choice.amount,
+                optional=self.pending_choice.optional,
+                candidate_ids=self.pending_choice.candidate_ids,
+                prompt=self.pending_choice.prompt,
+            )
         return GameState(
             players=(self.players[0].clone(), self.players[1].clone()),
             active_player=self.active_player,
@@ -401,6 +564,8 @@ class GameState:
             victory_reason=self.victory_reason,
             next_instance_id=self.next_instance_id,
             known_opponent_inks=self.known_opponent_inks,
+            pending_choice=pc,
+            phase_before_choice=self.phase_before_choice,
         )
 
     def clone_and_determinize(
