@@ -1,0 +1,25 @@
+# Amber/Sapphire Control (Amber/Sapphire)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1dde8-7c73-7906-ad06-3e95f9476b6e)
+# Games Played: 952 | Win Rate: 45.59% | Meta Share: 5.34%
+# Signature Cards: Develop Your Brain, Let It Go, Moana - Curious Explorer
+4 Aurora - Holding Court
+1 Besties, Assemble!
+4 Develop Your Brain
+4 Mickey Mouse - Best in Town
+4 Hamm - Piggy Bank
+3 Ohana Means Family
+3 The Horseman Strikes!
+3 Belle - Snowfield Strategist
+1 Casa Madrigal - Courtyard
+4 Cinderella - Dream Come True
+1 Gaston - Superior Archer
+2 Let It Go
+2 Moana - Curious Explorer
+1 Hades - Meticulous Schemer
+2 Lionheart - Incumbent Mayor
+2 Spooky Sight
+4 Cinderella - Unintentional Icon
+4 Hades - Infernal Schemer
+4 Stitch - Carefree Surfer
+3 Minnie Mouse - Urban Visionary
+4 Raging Storm

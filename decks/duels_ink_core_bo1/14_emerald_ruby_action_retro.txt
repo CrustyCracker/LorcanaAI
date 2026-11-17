@@ -1,0 +1,22 @@
+# Emerald/Ruby Action Retro (Emerald/Ruby)
+# Source: https://duels.ink/stats/core-bo1 (ID: 01a1dde8-7c7e-75c5-b9f4-53fc371ebaad)
+# Games Played: 582 | Win Rate: 42.61% | Meta Share: 3.27%
+# Signature Cards: Piercing Attack, Mother Knows Best, Max Goof - Rebellious Teen
+4 Improvise
+4 Inner Strength
+2 Rivera Family Photo
+4 Another Tale to Spin
+2 Piercing Attack
+4 Strike a Good Match
+4 Malicious, Mean, and Scary
+4 Max Goof - Karaoke Star
+1 Max Goof - Rebellious Teen
+2 Mother Knows Best
+4 Retro Evolution Device
+3 Roller Bob - Sid's Toy
+4 The Torn Corner
+4 Tod - Clever Fox
+2 Strange Things
+4 Olaf - Snowman of Action
+4 Prince Phillip - Vanquisher of Foes
+4 The Leviathan - Guardian of Atlantis

@@ -1,0 +1,272 @@
+{
+  "baseline_bo1": 0.06163116311631163,
+  "baseline_bo3": 0.01403130313031303,
+  "scan_rows": [
+    {
+      "opp": "Emerald/Steel Midrange",
+      "card_in": "Lord MacGuffin - Clever Swordsman",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.2592,
+      "delta_bo3": 0.2592,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Emerald/Steel Midrange",
+      "card_in": "Air Drop",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0555,
+      "delta_bo3": 0.0555,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala."
+    },
+    {
+      "opp": "Emerald/Steel Midrange",
+      "card_in": "Buzz Lightyear - On the Way",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem."
+    },
+    {
+      "opp": "Emerald/Steel Midrange",
+      "card_in": "Horace - Clumsy Clod",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala."
+    },
+    {
+      "opp": "Emerald/Steel Midrange",
+      "card_in": "Buzz Lightyear - On the Way",
+      "card_out": "Rivera Family Photo",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem."
+    },
+    {
+      "opp": "Amber/Emerald Circle of Life",
+      "card_in": "Donald Duck - Perfect Gentleman",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0555,
+      "delta_bo3": 0.052,
+      "rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Amber/Emerald Circle of Life",
+      "card_in": "Scrooge McDuck - S.H.U.S.H. Agent",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0555,
+      "delta_bo3": 0.052,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Amber/Emerald Circle of Life",
+      "card_in": "Baloo - Carefree Bear",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": -0.0035,
+      "rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Amber/Emerald Circle of Life",
+      "card_in": "David Xanatos - Charismatic Leader",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": -0.0035,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Amber/Emerald Circle of Life",
+      "card_in": "Minnie Mouse - Mrs. Cratchit",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": -0.0035,
+      "rationale": "Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    },
+    {
+      "opp": "Amber/Sapphire Detectives",
+      "card_in": "Horace - Clumsy Clod",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0555,
+      "delta_bo3": 0.0555,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala."
+    },
+    {
+      "opp": "Amber/Sapphire Detectives",
+      "card_in": "Horace - Clumsy Clod",
+      "card_out": "Rivera Family Photo",
+      "copies": 2,
+      "bo3": 0.0555,
+      "delta_bo3": 0.0555,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala."
+    },
+    {
+      "opp": "Amber/Sapphire Detectives",
+      "card_in": "Buzz Lightyear - On the Way",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem."
+    },
+    {
+      "opp": "Amber/Sapphire Detectives",
+      "card_in": "Buzz Lightyear - On the Way",
+      "card_out": "Rivera Family Photo",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Zwiększa przewagę kart (card advantage) w dłuższych wymianach; Wyciąga kluczowe pieśni/sweepery z ręki przeciwnika przed ich zagraniem."
+    },
+    {
+      "opp": "Amber/Sapphire Detectives",
+      "card_in": "Lord MacGuffin - Clever Swordsman",
+      "card_out": "The Leviathan - Guardian of Atlantis",
+      "copies": 2,
+      "bo3": 0.0,
+      "delta_bo3": 0.0,
+      "rationale": "Zapewnia bezpośrednią odpowiedź (removal/board control) na kluczowe postacie rywala; Wywiera silną presję punktową (+2 Lore na quest) wymuszając niekorzystne wymiany."
+    }
+  ],
+  "packages": [
+    {
+      "label": "+2 Piercing Attack",
+      "swaps": [
+        {
+          "out": "The Torn Corner",
+          "in": "Piercing Attack",
+          "n": 2
+        }
+      ],
+      "bo1": 0.02619261926192619,
+      "bo3": 0.0033923392339233922,
+      "d_bo1": -0.03543854385438544,
+      "d_bo3": -0.010638963896389637
+    },
+    {
+      "label": "+2 Mother Knows Best",
+      "swaps": [
+        {
+          "out": "Strange Things",
+          "in": "Mother Knows Best",
+          "n": 2
+        }
+      ],
+      "bo1": 0.039048904890489046,
+      "bo3": 0.007634863486348634,
+      "d_bo1": -0.022582258225822584,
+      "d_bo3": -0.006396439643964396
+    },
+    {
+      "label": "+1 Rebellious Teen",
+      "swaps": [
+        {
+          "out": "Sid Phillips - Toy Surgeon",
+          "in": "Max Goof - Rebellious Teen",
+          "n": 1
+        }
+      ],
+      "bo1": 0.030983098309830984,
+      "bo3": 0.005309130913091309,
+      "d_bo1": -0.030648064806480645,
+      "d_bo3": -0.00872217221722172
+    },
+    {
+      "label": "+1 Leviathan",
+      "swaps": [
+        {
+          "out": "Sid Phillips - Toy Surgeon",
+          "in": "The Leviathan - Guardian of Atlantis",
+          "n": 1
+        }
+      ],
+      "bo1": 0.03397339733973398,
+      "bo3": 0.006596459645964597,
+      "d_bo1": -0.02765776577657765,
+      "d_bo3": -0.007434843484348433
+    },
+    {
+      "label": "+1 Phillip",
+      "swaps": [
+        {
+          "out": "Strange Things",
+          "in": "Prince Phillip - Vanquisher of Foes",
+          "n": 1
+        }
+      ],
+      "bo1": 0.039268926892689265,
+      "bo3": 0.009165216521652166,
+      "d_bo1": -0.022362236223622364,
+      "d_bo3": -0.004866086608660863
+    },
+    {
+      "label": "Action-like flex",
+      "swaps": [
+        {
+          "out": "White Rabbit - Late Again",
+          "in": "Piercing Attack",
+          "n": 2
+        },
+        {
+          "out": "Sid Phillips - Toy Surgeon",
+          "in": "Max Goof - Rebellious Teen",
+          "n": 1
+        },
+        {
+          "out": "Strange Things",
+          "in": "Mother Knows Best",
+          "n": 1
+        },
+        {
+          "out": "Rivera Family Photo",
+          "in": "The Leviathan - Guardian of Atlantis",
+          "n": 1
+        },
+        {
+          "out": "The Torn Corner",
+          "in": "Prince Phillip - Vanquisher of Foes",
+          "n": 1
+        }
+      ],
+      "bo1": 0.02306730673067307,
+      "bo3": 0.0023067306730673066,
+      "d_bo1": -0.038563856385638556,
+      "d_bo3": -0.011724572457245723
+    },
+    {
+      "label": "GS hate keep Rabbit",
+      "swaps": [
+        {
+          "out": "Sid Phillips - Toy Surgeon",
+          "in": "Piercing Attack",
+          "n": 1
+        },
+        {
+          "out": "Strange Things",
+          "in": "Piercing Attack",
+          "n": 1
+        },
+        {
+          "out": "The Torn Corner",
+          "in": "Mother Knows Best",
+          "n": 2
+        }
+      ],
+      "bo1": 0.017726772677267726,
+      "bo3": 0.0017726772677267727,
+      "d_bo1": -0.0439043904390439,
+      "d_bo3": -0.012258625862586256
+    }
+  ],
+  "note": "Absolute WRs low: Retro Device/song effects mostly empty in CompiledAbilities; use relative Δ + meta centroid."
+}
